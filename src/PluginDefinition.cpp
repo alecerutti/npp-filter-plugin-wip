@@ -16,17 +16,11 @@
 //Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 
 #include "PluginDefinition.h"
-//#include "menuCmdID.h"
 
 #include "DockingFeature/Docking.h"
-
-//#include <commctrl.h>
-//#pragma comment(lib, "comctl32.lib")
-//#include <windowsx.h>
 #include <string>
-//#include <fstream>
-//#include <WinUser.h>
-//#include <iomanip>
+#include <fstream>
+#include <windowsx.h>
 
 //
 // The plugin data that Notepad++ needs
@@ -38,59 +32,6 @@ FuncItem funcItem[nbFunc];
 //
 NppData nppData;
 
-//
-// Initialize your plugin data here
-// It will be called while plugin loading   
-void pluginInit(HANDLE /*hModule*/)
-{
-	// TODO parse xaml
-}
-
-//
-// Here you can do the clean up, save the parameters (if any) for the next session
-//
-void pluginCleanUp()
-{
-	// TODO save xml
-}
-
-//
-// Initialization of your plugin commands
-// You should fill your plugins commands here
-void commandMenuInit()
-{
-	setCommand(0, TEXT("Show/Hide Panel"), panel, NULL, false);
-}
-
-//
-// Here you can do the clean up (especially for the shortcut)
-//
-void commandMenuCleanUp()
-{
-}
-
-//
-// This function help you to initialize your plugin commands
-//
-bool setCommand(size_t index, TCHAR* cmdName, PFUNCPLUGINCMD pFunc, ShortcutKey* sk, bool check0nInit)
-{
-	if (index >= nbFunc)
-		return false;
-
-	if (!pFunc)
-		return false;
-
-	lstrcpy(funcItem[index]._itemName, cmdName);
-	funcItem[index]._pFunc = pFunc;
-	funcItem[index]._init2Check = check0nInit;
-	funcItem[index]._pShKey = sk;
-
-	return true;
-}
-
-//----------------------------------------------//
-//-- DEFINIZIONI --//
-//----------------------------------------------//
 
 // Tipo di item nel TreeView
 enum ItemType
@@ -123,15 +64,92 @@ HWND hTreeView = NULL;
 HMENU hFilterMenu = NULL;
 // Menu popup per file
 HMENU hFileMenu = NULL;
-// Item cliccato
-HTREEITEM hItemClicked = NULL;
-
-bool isVisible = false;
 
 tTbData myDock = { 0 };
 
+//std::ofstream fileOut("c:\\users\\user\\downloads\\debug.txt");
+
 const wchar_t* CONTAINER_CLASS = L"FilterManagerContainer";
 
+//
+// Initialize your plugin data here
+// It will be called while plugin loading   
+void pluginInit(HANDLE /*hModule*/)
+{
+	// Creazione menu popup (non dipendono dalla finestra)
+	hFilterMenu = CreatePopupMenu();
+	AppendMenu(hFilterMenu, MF_STRING, ID_ADD_FILTER, L"Add Filter");
+	AppendMenu(hFilterMenu, MF_STRING, ID_RENAME_FILTER, L"Rename Filter");
+	AppendMenu(hFilterMenu, MF_STRING, ID_DELETE_FILTER, L"Delete Filter");
+	AppendMenu(hFilterMenu, MF_SEPARATOR, 0, NULL);
+	AppendMenu(hFilterMenu, MF_STRING, ID_ADD_CURRENT_DOC, L"Add Current Document");
+
+	hFileMenu = CreatePopupMenu();
+	AppendMenu(hFileMenu, MF_STRING, ID_REMOVE_FILE, L"Remove");
+
+	// Inizializzazione dati del docking (solo struttura)
+	ZeroMemory(&myDock, sizeof(tTbData));
+	myDock.pszName = L"Filter Manager";
+	myDock.dlgID = 0;
+	myDock.uMask = 0;
+	myDock.pszAddInfo = nullptr;
+	myDock.hIconTab = nullptr;
+	myDock.pszModuleName = L"MyPlugin.dll";
+
+	// loadXmlConfiguration();
+}
+
+//
+// Here you can do the clean up, save the parameters (if any) for the next session
+//
+void pluginCleanUp()
+{
+	// TODO save xml
+}
+
+//
+// Initialization of your plugin commands
+// You should fill your plugins commands here
+void commandMenuInit()
+{
+	ShortcutKey sk;
+	sk._isCtrl = true;
+	sk._isAlt = true;
+	sk._isShift = true;
+	sk._key = 'M';
+
+	setCommand(0, TEXT("Show/Hide Panel"), panel, &sk, false);
+}
+
+//
+// Here you can do the clean up (especially for the shortcut)
+//
+void commandMenuCleanUp()
+{
+}
+
+//
+// This function help you to initialize your plugin commands
+//
+bool setCommand(size_t index, TCHAR* cmdName, PFUNCPLUGINCMD pFunc, ShortcutKey* sk, bool check0nInit)
+{
+	if (index >= nbFunc)
+		return false;
+
+	if (!pFunc)
+		return false;
+
+	lstrcpy(funcItem[index]._itemName, cmdName);
+	funcItem[index]._pFunc = pFunc;
+	funcItem[index]._init2Check = check0nInit;
+	funcItem[index]._pShKey = sk;
+
+	return true;
+}
+
+//----------------------------------------------//
+//-- DEFINIZIONI --//
+//----------------------------------------------//
 // Forward declarations
 LRESULT CALLBACK ContainerProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam);
 void addRootFilter();
@@ -141,6 +159,7 @@ void renameFilter(HTREEITEM item);
 void addCurrentDocument(HTREEITEM filterItem);
 void removeFile(HTREEITEM fileItem);
 void openFile(HTREEITEM fileItem);
+HTREEITEM getSelectedItem();
 TreeItemData* getItemData(HTREEITEM item);
 ItemType getItemType(HTREEITEM item);
 
@@ -148,7 +167,7 @@ void panel()
 {
 	if (!hContainer)
 	{
-		// Registra la classe della finestra contenitore
+		/* Callback for container class */
 		WNDCLASSEX wc = { 0 };
 		wc.cbSize = sizeof(WNDCLASSEX);
 		wc.lpfnWndProc = ContainerProc;
@@ -157,7 +176,7 @@ void panel()
 		wc.hbrBackground = (HBRUSH)(COLOR_WINDOW + 1);
 		RegisterClassEx(&wc);
 
-		// Crea la finestra contenitore
+		/* Container */
 		hContainer = CreateWindowEx(
 			0,
 			CONTAINER_CLASS,
@@ -170,12 +189,12 @@ void panel()
 			nullptr
 		);
 
-		// Crea il TreeView DENTRO il contenitore
+		/* TreeView within container */
 		hTreeView = CreateWindowEx(
 			WS_EX_CLIENTEDGE,
 			WC_TREEVIEW,
 			L"",
-			WS_CHILD | WS_VISIBLE | WS_BORDER | TVS_HASLINES | TVS_LINESATROOT | TVS_HASBUTTONS | TVS_EDITLABELS,
+			WS_CHILD | WS_VISIBLE | WS_BORDER | TVS_HASLINES | TVS_LINESATROOT | TVS_HASBUTTONS | TVS_EDITLABELS | TVS_FULLROWSELECT,
 			0, 0, 300, 400,
 			hContainer,
 			nullptr,
@@ -183,19 +202,6 @@ void panel()
 			nullptr
 		);
 
-		// Crea il menu popup per FILTRI
-		hFilterMenu = CreatePopupMenu();
-		AppendMenu(hFilterMenu, MF_STRING, ID_ADD_FILTER, L"Add Filter");
-		AppendMenu(hFilterMenu, MF_STRING, ID_RENAME_FILTER, L"Rename Filter");
-		AppendMenu(hFilterMenu, MF_STRING, ID_DELETE_FILTER, L"Delete Filter");
-		AppendMenu(hFilterMenu, MF_SEPARATOR, 0, NULL);
-		AppendMenu(hFilterMenu, MF_STRING, ID_ADD_CURRENT_DOC, L"Add Current Document");
-
-		// Crea il menu popup per FILE
-		hFileMenu = CreatePopupMenu();
-		AppendMenu(hFileMenu, MF_STRING, ID_REMOVE_FILE, L"Remove");
-
-		// Configura il docking
 		myDock.hClient = hContainer;
 		myDock.pszName = L"Filter Manager";
 		myDock.dlgID = 0;
@@ -205,19 +211,12 @@ void panel()
 		myDock.pszModuleName = L"MyPlugin.dll";
 
 		::SendMessage(nppData._nppHandle, NPPM_DMMREGASDCKDLG, 0, (LPARAM)&myDock);
+
+		return;
 	}
 
-	// Mostra/nascondi
-	if (!isVisible)
-	{
-		::SendMessage(nppData._nppHandle, NPPM_DMMSHOW, 0, (LPARAM)myDock.hClient);
-		isVisible = true;
-	}
-	else
-	{
-		::SendMessage(nppData._nppHandle, NPPM_DMMHIDE, 0, (LPARAM)myDock.hClient);
-		isVisible = false;
-	}
+	const bool isVisibleNow = IsWindowVisible(myDock.hClient);
+	::SendMessage(nppData._nppHandle, isVisibleNow ? NPPM_DMMHIDE : NPPM_DMMSHOW, 0, (LPARAM)myDock.hClient);
 }
 
 void addRootFilter()
@@ -251,9 +250,9 @@ void addChildFilter(HTREEITEM parent)
 	TreeView_Expand(hTreeView, parent, TVE_EXPAND);
 }
 
+// TODO remove
 void deleteItemRecursive(HTREEITEM item)
 {
-	// Libera memoria dei figli prima
 	HTREEITEM child = TreeView_GetChild(hTreeView, item);
 	while (child)
 	{
@@ -262,7 +261,6 @@ void deleteItemRecursive(HTREEITEM item)
 		child = next;
 	}
 
-	// Libera la memoria di questo item
 	TreeItemData* data = getItemData(item);
 	if (data)
 	{
@@ -286,7 +284,7 @@ void renameFilter(HTREEITEM item)
 
 void addCurrentDocument(HTREEITEM filterItem)
 {
-	// Ottieni il path del documento corrente in Notepad++
+	/* Get path of doc open in Notepad++ */
 	wchar_t filePath[MAX_PATH] = { 0 };
 	::SendMessage(nppData._nppHandle, NPPM_GETFULLCURRENTPATH, MAX_PATH, (LPARAM)filePath);
 
@@ -296,22 +294,21 @@ void addCurrentDocument(HTREEITEM filterItem)
 		return;
 	}
 
-	// Estrai solo il nome del file dal path completo
+	/* Extract name froma path */
 	wchar_t* fileName = wcsrchr(filePath, L'\\');
 	if (!fileName)
 		fileName = wcsrchr(filePath, L'/');
 
 	if (fileName)
-		fileName++; // Salta il separatore
+		fileName++; /* Skip separator */
 	else
-		fileName = filePath; // Nessun separatore trovato, usa tutto
+		fileName = filePath;
 
-	// Crea la struttura dati per il file
 	TreeItemData* data = new TreeItemData();
 	data->type = TYPE_FILE;
 	data->filePath = filePath;
 
-	// Inserisci il file come figlio del filtro
+	/* Insert file as child of filer */
 	TVINSERTSTRUCT tvis = {};
 	tvis.hParent = filterItem;
 	tvis.hInsertAfter = TVI_LAST;
@@ -338,9 +335,13 @@ void openFile(HTREEITEM fileItem)
 	TreeItemData* data = getItemData(fileItem);
 	if (data && data->type == TYPE_FILE)
 	{
-		// Apri il file in Notepad++
 		::SendMessage(nppData._nppHandle, NPPM_DOOPEN, 0, (LPARAM)data->filePath.c_str());
 	}
+}
+
+HTREEITEM getSelectedItem()
+{
+	return TreeView_GetSelection(hTreeView);
 }
 
 TreeItemData* getItemData(HTREEITEM item)
@@ -365,7 +366,7 @@ ItemType getItemType(HTREEITEM item)
 	if (data)
 		return data->type;
 
-	return TYPE_FILTER; // Default
+	return TYPE_FILTER;
 }
 
 LRESULT CALLBACK ContainerProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
@@ -386,12 +387,13 @@ LRESULT CALLBACK ContainerProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam
 	case WM_COMMAND:
 	{
 		int cmd = LOWORD(wParam);
+		HTREEITEM item = getSelectedItem();
 
 		if (cmd == ID_ADD_FILTER)
 		{
-			if (hItemClicked)
+			if (item)
 			{
-				addChildFilter(hItemClicked);
+				addChildFilter(item);
 			}
 			else
 			{
@@ -401,35 +403,35 @@ LRESULT CALLBACK ContainerProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam
 		}
 		else if (cmd == ID_DELETE_FILTER)
 		{
-			if (hItemClicked)
+			if (item && getItemType(item) == TYPE_FILTER)
 			{
-				deleteFilter(hItemClicked);
-				hItemClicked = NULL;
+				//deleteFilter(hItemClicked);
+				TreeView_DeleteItem(hTreeView, item);
 			}
 			return 0;
 		}
 		else if (cmd == ID_RENAME_FILTER)
 		{
-			if (hItemClicked)
+			if (item && getItemType(item) == TYPE_FILTER)
 			{
-				renameFilter(hItemClicked);
+				renameFilter(item);
 			}
 			return 0;
 		}
 		else if (cmd == ID_ADD_CURRENT_DOC)
 		{
-			if (hItemClicked)
+			if (item && getItemType(item) == TYPE_FILTER)
 			{
-				addCurrentDocument(hItemClicked);
+				addCurrentDocument(item);
 			}
 			return 0;
 		}
 		else if (cmd == ID_REMOVE_FILE)
 		{
-			if (hItemClicked)
+			if (item && getItemType(item) == TYPE_FILE)
 			{
-				removeFile(hItemClicked);
-				hItemClicked = NULL;
+				//removeFile(hItemClicked);
+				TreeView_DeleteItem(hTreeView, item);
 			}
 			return 0;
 		}
@@ -444,9 +446,33 @@ LRESULT CALLBACK ContainerProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam
 		{
 			switch (lpnmh->code)
 			{
+			case NM_CLICK:
+			{
+				DWORD pos = GetMessagePos();
+
+				POINT pt = {
+					GET_X_LPARAM(pos),
+					GET_Y_LPARAM(pos)
+				};
+
+				ScreenToClient(hTreeView, &pt);
+
+				TVHITTESTINFO ht = {};
+				ht.pt = pt;
+
+				HTREEITEM item = TreeView_HitTest(hTreeView, &ht);
+
+				if (item)
+				{
+					TreeView_SelectItem(hTreeView, item);
+					return TRUE;
+				}
+
+				break;
+			}
+
 			case NM_DBLCLK:
 			{
-				// Doppio click su un item
 				POINT point;
 				GetCursorPos(&point);
 				ScreenToClient(hTreeView, &point);
@@ -466,39 +492,34 @@ LRESULT CALLBACK ContainerProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam
 			{
 				POINT point;
 				GetCursorPos(&point);
-
-				POINT pointClient = point;
-				ScreenToClient(hTreeView, &pointClient);
+				//ScreenToClient(hTreeView, &point);
 
 				TVHITTESTINFO thti = {};
-				thti.pt = pointClient;
-
-				hItemClicked = TreeView_HitTest(hTreeView, &thti);
+				thti.pt = point;
+				HTREEITEM hItemClicked = TreeView_HitTest(hTreeView, &thti);
 
 				if (hItemClicked)
 				{
 					TreeView_SelectItem(hTreeView, hItemClicked);
 
-					// Mostra menu diverso in base al tipo
+					/* Show different menu depending on item type */
 					ItemType type = getItemType(hItemClicked);
 
 					if (type == TYPE_FILTER)
 					{
-						// Menu per filtri
 						EnableMenuItem(hFilterMenu, ID_RENAME_FILTER, MF_ENABLED);
 						EnableMenuItem(hFilterMenu, ID_DELETE_FILTER, MF_ENABLED);
 						EnableMenuItem(hFilterMenu, ID_ADD_CURRENT_DOC, MF_ENABLED);
 						TrackPopupMenu(hFilterMenu, TPM_RIGHTBUTTON, point.x, point.y, 0, hwnd, NULL);
 					}
-					else // TYPE_FILE
+					else if (type == TYPE_FILE)
 					{
-						// Menu per file
 						TrackPopupMenu(hFileMenu, TPM_RIGHTBUTTON, point.x, point.y, 0, hwnd, NULL);
 					}
 				}
 				else
 				{
-					// Click su area vuota - mostra solo "Add Filter"
+					/* Click on empty zone shows "Add Filter" only */
 					EnableMenuItem(hFilterMenu, ID_RENAME_FILTER, MF_GRAYED);
 					EnableMenuItem(hFilterMenu, ID_DELETE_FILTER, MF_GRAYED);
 					EnableMenuItem(hFilterMenu, ID_ADD_CURRENT_DOC, MF_GRAYED);
@@ -509,16 +530,16 @@ LRESULT CALLBACK ContainerProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam
 
 			case TVN_BEGINLABELEDIT:
 			{
-				// Permetti l'editing solo sui filtri, non sui file
+				/* Allow renaming filters only */
 				LPNMTVDISPINFO pInfo = (LPNMTVDISPINFO)lParam;
 				ItemType type = getItemType(pInfo->item.hItem);
 
 				if (type == TYPE_FILE)
 				{
-					return TRUE; // TRUE = blocca editing
+					return TRUE;
 				}
 
-				return FALSE; // FALSE = permetti editing
+				return FALSE;
 			}
 
 			case TVN_ENDLABELEDIT:
@@ -538,16 +559,88 @@ LRESULT CALLBACK ContainerProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam
 
 			case TVN_DELETEITEM:
 			{
-				// Already free in WM_COMMAND ID_DELETE_FILTER
+				/* TODO: check if this is called for each item recursevly otherwise there is memory leak */
+				LPNMTREEVIEW pnmtv = (LPNMTREEVIEW)lParam;
+				TreeItemData* data = (TreeItemData*)pnmtv->itemOld.lParam;
 
-				//// Libera la memoria quando un item viene eliminato
-				//LPNMTREEVIEW pnmtv = (LPNMTREEVIEW)lParam;
-				//TreeItemData* data = (TreeItemData*)pnmtv->itemOld.lParam;
-				//if (data)
-				//{
-				//	delete data;
-				//}
-				//return 0;
+				if (data)
+				{
+					delete data;
+				}
+
+				break;
+			}
+
+			case TVN_KEYDOWN:
+			{
+				LPNMTVKEYDOWN pKeyDown = (LPNMTVKEYDOWN)lParam;
+				HTREEITEM item = getSelectedItem();
+
+				if (!item) break;
+
+				switch (pKeyDown->wVKey)
+				{
+				case 'R':
+					if (getItemType(item) == TYPE_FILTER)
+					{
+						SendMessage(hwnd, WM_COMMAND, ID_RENAME_FILTER, 0);
+					}
+					return TRUE; /* Avoids default Windows beep */
+				case VK_RETURN:
+					if (getItemType(item) == TYPE_FILE)
+					{
+						openFile(item);
+					}
+					return TRUE;
+
+				case VK_ESCAPE:
+					TreeView_SelectItem(hTreeView, NULL);
+					return TRUE;
+
+				case VK_DELETE:
+					/* Deleting filters is very dangerous and should be done via menu */
+/*					if (getItemType(item) == TYPE_FILTER)
+					{
+						SendMessage(hwnd, WM_COMMAND, ID_DELETE_FILTER, 0);
+					}
+					else*/ if (getItemType(item) == TYPE_FILE)
+					{
+						SendMessage(hwnd, WM_COMMAND, ID_REMOVE_FILE, 0);
+					}
+					return TRUE;
+				case VK_SPACE:
+				{
+					HTREEITEM root = TreeView_GetRoot(hTreeView);
+					if (root)
+						TreeView_SelectItem(hTreeView, root);
+					return TRUE;
+				}
+				case 'F':
+				{
+					bool shiftPressed = (GetKeyState(VK_SHIFT) & 0x8000) != 0;
+					bool capsLockOn = (GetKeyState(VK_CAPITAL) & 0x0001) != 0;
+					bool isUpper = ((capsLockOn && !shiftPressed) || (!capsLockOn && shiftPressed));
+
+					if (isUpper)
+					{
+						addRootFilter();
+					}
+					else
+					{
+						if (getItemType(item) == TYPE_FILTER)
+						{
+							SendMessage(hwnd, WM_COMMAND, ID_ADD_FILTER, 0);
+						}
+					}
+					return TRUE;
+				}
+				case 'D':
+					if (getItemType(item) == TYPE_FILTER)
+					{
+						SendMessage(hwnd, WM_COMMAND, ID_ADD_CURRENT_DOC, 0);
+					}
+					return TRUE;
+				}
 			}
 			}
 		}

@@ -116,7 +116,8 @@ void commandMenuInit()
 	sk._isShift = true;
 	sk._key = 'M';
 
-	setCommand(0, TEXT("Show/Hide Panel"), panel, &sk, false);
+	WCHAR cmdName[] = L"Show/Hide Panel";
+	setCommand(0, cmdName, panel, &sk, false);
 }
 
 //
@@ -262,7 +263,8 @@ void addRootFilter()
 	tvis.hParent = TVI_ROOT;
 	tvis.hInsertAfter = TVI_LAST;
 	tvis.item.mask = TVIF_TEXT | TVIF_PARAM;
-	tvis.item.pszText = L"New Filter";
+	wchar_t newFilterText[] = L"New Filter";
+	tvis.item.pszText = newFilterText;
 	tvis.item.lParam = (LPARAM)data;
 
 	HTREEITEM newItem = TreeView_InsertItem(hTreeView, &tvis);
@@ -279,7 +281,8 @@ void addChildFilter(HTREEITEM parent)
 	tvis.hParent = parent;
 	tvis.hInsertAfter = TVI_LAST;
 	tvis.item.mask = TVIF_TEXT | TVIF_PARAM;
-	tvis.item.pszText = L"New Filter";
+	wchar_t newFilterText[] = L"New Filter";
+	tvis.item.pszText = newFilterText;
 	tvis.item.lParam = (LPARAM)data;
 
 	HTREEITEM newItem = TreeView_InsertItem(hTreeView, &tvis);
@@ -505,7 +508,6 @@ LRESULT CALLBACK ContainerProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam
 		{
 			if (item && getItemType(item) == TYPE_FILE)
 			{
-				//removeFile(hItemClicked);
 				TreeView_DeleteItem(hTreeView, item);
 			}
 			return 0;
@@ -691,14 +693,13 @@ LRESULT CALLBACK ContainerProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam
 				case VK_SPACE:
 				{
 					/* SPACE goes to first element of the tree; MAIUSC + SPACE goes to the last element of the tree */
+
 					bool shiftPressed = (GetKeyState(VK_SHIFT) & 0x8000) != 0;
 					bool capsLockOn = (GetKeyState(VK_CAPITAL) & 0x0001) != 0;
 					bool isUpper = ((capsLockOn && !shiftPressed) || (!capsLockOn && shiftPressed));
 
 					HTREEITEM root = TreeView_GetRoot(hTreeView);
-					MessageBox(hContainer,
-						isUpper ? L"MAIUSC+SPACE rilevato" : L"SPACE rilevato",
-						L"Debug", MB_OK);
+
 					if (isUpper)
 					{
 						HTREEITEM item = root;

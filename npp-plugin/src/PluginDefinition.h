@@ -19,9 +19,11 @@
 
 #include "PluginInterface.h"
 #include <commctrl.h> // TreeView
+#include "tinyxml2.h"
 
-// Nome plugin
+// Const stuff
 const TCHAR NPP_PLUGIN_NAME[] = TEXT("FilterManager");
+static const wchar_t* CONTAINER_CLASS = L"FilterManagerContainer";
 
 // Numero di comandi
 const int nbFunc = 2;
@@ -37,4 +39,7 @@ bool setCommand(size_t index, TCHAR* cmdName, PFUNCPLUGINCMD pFunc, ShortcutKey*
 void panel();
 
 // TreeView
-LRESULT CALLBACK DockProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam);
+void expandNode(HTREEITEM item);
+void collapseNode(HTREEITEM item);
+void expandAllNodes();
+void collapseAllNodes();

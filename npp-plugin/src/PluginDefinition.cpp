@@ -69,8 +69,6 @@ tTbData myDock = { 0 };
 
 //std::ofstream fileOut("c:\\users\\user\\downloads\\debug.txt");
 
-const wchar_t* CONTAINER_CLASS = L"FilterManagerContainer";
-
 //
 // Initialize your plugin data here
 // It will be called while plugin loading   
@@ -219,6 +217,42 @@ void panel()
 	::SendMessage(nppData._nppHandle, isVisibleNow ? NPPM_DMMHIDE : NPPM_DMMSHOW, 0, (LPARAM)myDock.hClient);
 }
 
+void expandNode(HTREEITEM item)
+{
+	if (!item) return;
+
+	TreeView_Expand(hTreeView, item, TVE_EXPAND);
+}
+
+void collapseNode(HTREEITEM item)
+{
+	if (!item) return;
+
+	TreeView_Expand(hTreeView, item, TVE_COLLAPSE);
+}
+
+void expandAllNodes()
+{
+	HTREEITEM item = TreeView_GetRoot(hTreeView);
+
+	while (item)
+	{
+		expandNode(item);
+		item = TreeView_GetNextSibling(hTreeView, item);
+	}
+}
+
+void collapseAllNodes()
+{
+	HTREEITEM item = TreeView_GetRoot(hTreeView);
+
+	while (item)
+	{
+		collapseNode(item);
+		item = TreeView_GetNextSibling(hTreeView, item);
+	}
+}
+
 void addRootFilter()
 {
 	TreeItemData* data = new TreeItemData();
@@ -231,7 +265,9 @@ void addRootFilter()
 	tvis.item.pszText = L"New Filter";
 	tvis.item.lParam = (LPARAM)data;
 
-	TreeView_InsertItem(hTreeView, &tvis);
+	HTREEITEM newItem = TreeView_InsertItem(hTreeView, &tvis);
+
+	if (newItem) TreeView_SelectItem(hTreeView, newItem);
 }
 
 void addChildFilter(HTREEITEM parent)
@@ -246,8 +282,10 @@ void addChildFilter(HTREEITEM parent)
 	tvis.item.pszText = L"New Filter";
 	tvis.item.lParam = (LPARAM)data;
 
-	TreeView_InsertItem(hTreeView, &tvis);
+	HTREEITEM newItem = TreeView_InsertItem(hTreeView, &tvis);
 	TreeView_Expand(hTreeView, parent, TVE_EXPAND);
+
+	if (newItem) TreeView_SelectItem(hTreeView, newItem);
 }
 
 // TODO remove
@@ -384,6 +422,18 @@ LRESULT CALLBACK ContainerProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam
 		return 0;
 	}
 
+	case WM_SETFOCUS:
+	{
+		HTREEITEM selected = TreeView_GetSelection(hTreeView);
+		if (!selected)
+		{
+			HTREEITEM root = TreeView_GetRoot(hTreeView);
+			if (root)
+				TreeView_SelectItem(hTreeView, root);
+		}
+		return 0;
+	}
+
 	case WM_COMMAND:
 	{
 		int cmd = LOWORD(wParam);
@@ -405,8 +455,33 @@ LRESULT CALLBACK ContainerProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam
 		{
 			if (item && getItemType(item) == TYPE_FILTER)
 			{
-				//deleteFilter(hItemClicked);
-				TreeView_DeleteItem(hTreeView, item);
+				int res = MessageBox(
+					hContainer,
+					L"Are you sure to delete the selected filter and all its subfilters?",
+					L"Confirm deletion",
+					MB_YESNO | MB_ICONWARNING | MB_DEFBUTTON2
+				);
+
+				if (res == IDYES)
+				{
+					HTREEITEM parent = TreeView_GetParent(hTreeView, item);
+
+					/* Restore focus */
+					SetFocus(hTreeView);
+
+					if (parent)
+					{
+						TreeView_SelectItem(hTreeView, parent);
+					}
+					else
+					{
+						HTREEITEM root = TreeView_GetRoot(hTreeView);
+
+						if (root) TreeView_SelectItem(hTreeView, root);
+					}
+
+					TreeView_DeleteItem(hTreeView, item);
+				}
 			}
 			return 0;
 		}
@@ -492,10 +567,13 @@ LRESULT CALLBACK ContainerProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam
 			{
 				POINT point;
 				GetCursorPos(&point);
-				//ScreenToClient(hTreeView, &point);
+
+				POINT clientPt = point;
+				ScreenToClient(hTreeView, &clientPt);
 
 				TVHITTESTINFO thti = {};
-				thti.pt = point;
+				thti.pt = clientPt;
+
 				HTREEITEM hItemClicked = TreeView_HitTest(hTreeView, &thti);
 
 				if (hItemClicked)
@@ -598,21 +676,48 @@ LRESULT CALLBACK ContainerProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam
 					return TRUE;
 
 				case VK_DELETE:
-					/* Deleting filters is very dangerous and should be done via menu */
-/*					if (getItemType(item) == TYPE_FILTER)
+				case 'D':
+
+					if (getItemType(item) == TYPE_FILTER)
 					{
 						SendMessage(hwnd, WM_COMMAND, ID_DELETE_FILTER, 0);
 					}
-					else*/ if (getItemType(item) == TYPE_FILE)
+					else if (getItemType(item) == TYPE_FILE)
 					{
 						SendMessage(hwnd, WM_COMMAND, ID_REMOVE_FILE, 0);
 					}
+
 					return TRUE;
 				case VK_SPACE:
 				{
+					/* SPACE goes to first element of the tree; MAIUSC + SPACE goes to the last element of the tree */
+					bool shiftPressed = (GetKeyState(VK_SHIFT) & 0x8000) != 0;
+					bool capsLockOn = (GetKeyState(VK_CAPITAL) & 0x0001) != 0;
+					bool isUpper = ((capsLockOn && !shiftPressed) || (!capsLockOn && shiftPressed));
+
 					HTREEITEM root = TreeView_GetRoot(hTreeView);
-					if (root)
-						TreeView_SelectItem(hTreeView, root);
+					MessageBox(hContainer,
+						isUpper ? L"MAIUSC+SPACE rilevato" : L"SPACE rilevato",
+						L"Debug", MB_OK);
+					if (isUpper)
+					{
+						HTREEITEM item = root;
+						HTREEITEM last = NULL;
+
+						while (item)
+						{
+							last = item;
+							item = TreeView_GetNextSibling(hTreeView, item);
+						}
+
+						if (last) TreeView_SelectItem(hTreeView, last);
+					}
+					else
+					{
+
+						if (root) TreeView_SelectItem(hTreeView, root);
+					}
+
 					return TRUE;
 				}
 				case 'F':
@@ -634,12 +739,70 @@ LRESULT CALLBACK ContainerProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam
 					}
 					return TRUE;
 				}
-				case 'D':
+				case 'A':
 					if (getItemType(item) == TYPE_FILTER)
 					{
 						SendMessage(hwnd, WM_COMMAND, ID_ADD_CURRENT_DOC, 0);
 					}
 					return TRUE;
+
+					/* Vim motions */
+				case 'H':
+					SendMessage(hTreeView, WM_KEYDOWN, VK_LEFT, 0);
+					return TRUE;
+
+				case 'L':
+					SendMessage(hTreeView, WM_KEYDOWN, VK_RIGHT, 0);
+					return TRUE;
+
+				case 'K':
+					SendMessage(hTreeView, WM_KEYDOWN, VK_UP, 0);
+					return TRUE;
+
+				case 'J':
+					SendMessage(hTreeView, WM_KEYDOWN, VK_DOWN, 0);
+					return TRUE;
+
+				case 'E':
+				case 'e':
+				{
+					if (getItemType(item) != TYPE_FILTER)
+						return FALSE;
+
+					bool shiftPressed = (GetKeyState(VK_SHIFT) & 0x8000) != 0;
+					bool capsLockOn = (GetKeyState(VK_CAPITAL) & 0x0001) != 0;
+					bool isUpper = ((capsLockOn && !shiftPressed) || (!capsLockOn && shiftPressed));
+
+					if (isUpper)
+					{
+						expandAllNodes();
+					}
+					else
+					{
+						expandNode(item);
+					}
+					return TRUE;
+				}
+				case 'C':
+				case 'c':
+				{
+					if (getItemType(item) != TYPE_FILTER)
+						return FALSE;
+
+					bool shiftPressed = (GetKeyState(VK_SHIFT) & 0x8000) != 0;
+					bool capsLockOn = (GetKeyState(VK_CAPITAL) & 0x0001) != 0;
+					bool isUpper = ((capsLockOn && !shiftPressed) || (!capsLockOn && shiftPressed));
+
+					if (isUpper)
+					{
+						collapseAllNodes();
+					}
+					else
+					{
+						collapseNode(item);
+					}
+					return TRUE;
+				}
 				}
 			}
 			}

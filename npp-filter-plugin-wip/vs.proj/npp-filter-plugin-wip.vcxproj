@@ -20,6 +20,7 @@
     <PlatformToolset>v143</PlatformToolset>
     <WholeProgramOptimization>true</WholeProgramOptimization>
     <CharacterSet>Unicode</CharacterSet>
+    <UseOfMfc>false</UseOfMfc>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
   <ImportGroup Label="ExtensionSettings">
@@ -57,6 +58,7 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClInclude Include="..\src\ConfigurationManager.h" />
     <ClInclude Include="..\src\menuCmdID.h" />
     <ClInclude Include="..\src\Notepad_plus_msgs.h" />
     <ClInclude Include="..\src\Panel.h" />
@@ -66,6 +68,7 @@
     <ClInclude Include="..\src\Sci_Position.h" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="..\src\ConfigurationManager.cpp" />
     <ClCompile Include="..\src\NppPluginDemo.cpp" />
     <ClCompile Include="..\src\Panel.cpp" />
     <ClCompile Include="..\src\PluginDefinition.cpp" />
@@ -75,6 +78,11 @@
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="..\src\NppPluginDemo.rc" />
+  </ItemGroup>
+  <ItemGroup>
+    <Text Include="..\rsrc\Todo.txt">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
+    </Text>
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

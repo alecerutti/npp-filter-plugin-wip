@@ -1,0 +1,15 @@
+BUGS
+- Code refactor
+- Allow using shortcut when empty FilterManager window
+
+FEATURES TO ADD
+- Support for Xml configuration
+	- Store/Load different Xml configuration
+- Drag and Drop files under filters
+- Move
+	- files under different filter
+	- filter under different filter
+	- support such moves with shortcuits (alt + arrows/hjkl)
+- Help menu showing shortcuts
+- Applying colors to shortcuts
+- Shortcut to run panel()

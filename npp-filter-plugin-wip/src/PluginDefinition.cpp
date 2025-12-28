@@ -21,6 +21,9 @@
 #include <string>
 #include <fstream>
 #include <windowsx.h>
+#include "ConfigurationManager.h"
+
+std::string configPath = "C:\\users\\user\\downloads\\FileManager.xml";
 
 //
 // The plugin data that Notepad++ needs
@@ -34,18 +37,6 @@ NppData nppData;
 
 
 // Tipo di item nel TreeView
-enum ItemType
-{
-	TYPE_FILTER = 0,
-	TYPE_FILE = 1
-};
-
-// Struttura dati per ogni item del TreeView
-struct TreeItemData
-{
-	ItemType type;
-	std::wstring filePath; // Solo per TYPE_FILE
-};
 
 enum MenuCommands
 {
@@ -66,8 +57,6 @@ HMENU hFilterMenu = NULL;
 HMENU hFileMenu = NULL;
 
 tTbData myDock = { 0 };
-
-//std::ofstream fileOut("c:\\users\\user\\downloads\\debug.txt");
 
 //
 // Initialize your plugin data here
@@ -102,7 +91,6 @@ void pluginInit(HANDLE /*hModule*/)
 //
 void pluginCleanUp()
 {
-	// TODO save xml
 }
 
 //
@@ -149,10 +137,10 @@ bool setCommand(size_t index, TCHAR* cmdName, PFUNCPLUGINCMD pFunc, ShortcutKey*
 //----------------------------------------------//
 //-- DEFINIZIONI --//
 //----------------------------------------------//
-// Forward declarations
+// declarations
 LRESULT CALLBACK ContainerProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam);
-void addRootFilter();
-void addChildFilter(HTREEITEM parent);
+HTREEITEM addRootFilter();
+HTREEITEM addChildFilter(HTREEITEM parent);
 void deleteFilter(HTREEITEM item);
 void renameFilter(HTREEITEM item);
 void addCurrentDocument(HTREEITEM filterItem);
@@ -161,6 +149,20 @@ void openFile(HTREEITEM fileItem);
 HTREEITEM getSelectedItem();
 TreeItemData* getItemData(HTREEITEM item);
 ItemType getItemType(HTREEITEM item);
+
+// Aggiungi queste funzioni helper prima di pluginInit()
+
+std::wstring getTreeItemText(HTREEITEM hItem)
+{
+	wchar_t buffer[MAX_PATH] = { 0 };
+	TVITEM tvi = { 0 };
+	tvi.hItem = hItem;
+	tvi.mask = TVIF_TEXT;
+	tvi.pszText = buffer;
+	tvi.cchTextMax = MAX_PATH;
+	TreeView_GetItem(hTreeView, &tvi);
+	return std::wstring(buffer);
+}
 
 void panel()
 {
@@ -200,6 +202,8 @@ void panel()
 			GetModuleHandle(nullptr),
 			nullptr
 		);
+
+		loadTreeFromXml(configPath, hTreeView);
 
 		myDock.hClient = hContainer;
 		myDock.pszName = L"Filter Manager";
@@ -254,7 +258,7 @@ void collapseAllNodes()
 	}
 }
 
-void addRootFilter()
+HTREEITEM addRootFilter()
 {
 	TreeItemData* data = new TreeItemData();
 	data->type = TYPE_FILTER;
@@ -270,9 +274,11 @@ void addRootFilter()
 	HTREEITEM newItem = TreeView_InsertItem(hTreeView, &tvis);
 
 	if (newItem) TreeView_SelectItem(hTreeView, newItem);
+
+	return newItem;
 }
 
-void addChildFilter(HTREEITEM parent)
+HTREEITEM addChildFilter(HTREEITEM parent)
 {
 	TreeItemData* data = new TreeItemData();
 	data->type = TYPE_FILTER;
@@ -289,6 +295,8 @@ void addChildFilter(HTREEITEM parent)
 	TreeView_Expand(hTreeView, parent, TVE_EXPAND);
 
 	if (newItem) TreeView_SelectItem(hTreeView, newItem);
+
+	return newItem;
 }
 
 // TODO remove
@@ -385,6 +393,11 @@ HTREEITEM getSelectedItem()
 	return TreeView_GetSelection(hTreeView);
 }
 
+void unselectItem()
+{
+	TreeView_SelectItem(hTreeView, NULL);
+}
+
 TreeItemData* getItemData(HTREEITEM item)
 {
 	if (!item) return nullptr;
@@ -446,12 +459,15 @@ LRESULT CALLBACK ContainerProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam
 		{
 			if (item)
 			{
-				addChildFilter(item);
+				item = addChildFilter(item);
 			}
 			else
 			{
-				addRootFilter();
+				item = addRootFilter();
 			}
+
+			if (item) renameFilter(item);
+
 			return 0;
 		}
 		else if (cmd == ID_DELETE_FILTER)
@@ -600,6 +616,7 @@ LRESULT CALLBACK ContainerProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam
 				else
 				{
 					/* Click on empty zone shows "Add Filter" only */
+					unselectItem();
 					EnableMenuItem(hFilterMenu, ID_RENAME_FILTER, MF_GRAYED);
 					EnableMenuItem(hFilterMenu, ID_DELETE_FILTER, MF_GRAYED);
 					EnableMenuItem(hFilterMenu, ID_ADD_CURRENT_DOC, MF_GRAYED);
@@ -729,7 +746,8 @@ LRESULT CALLBACK ContainerProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam
 
 					if (isUpper)
 					{
-						addRootFilter();
+						unselectItem();
+						SendMessage(hwnd, WM_COMMAND, ID_ADD_FILTER, 0);
 					}
 					else
 					{
@@ -804,6 +822,8 @@ LRESULT CALLBACK ContainerProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam
 					}
 					return TRUE;
 				}
+				case 'S':
+					saveTreeToXml(configPath, hTreeView);
 				}
 			}
 			}

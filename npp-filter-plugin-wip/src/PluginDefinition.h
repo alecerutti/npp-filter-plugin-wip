@@ -20,6 +20,19 @@
 #include "PluginInterface.h"
 #include <commctrl.h> // TreeView
 #include "tinyxml2.h"
+#include <string>
+// Struttura dati per ogni item del TreeView
+enum ItemType
+{
+	TYPE_FILTER = 0,
+	TYPE_FILE = 1
+};
+
+struct TreeItemData
+{
+	ItemType type;
+	std::wstring filePath; // Solo per TYPE_FILE
+};
 
 // Const stuff
 const TCHAR NPP_PLUGIN_NAME[] = TEXT("FilterManager");

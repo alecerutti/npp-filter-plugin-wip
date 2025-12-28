@@ -39,6 +39,9 @@
     <ClInclude Include="..\src\PluginDefinition.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="..\src\ConfigurationManager.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\src\NppPluginDemo.cpp">
@@ -48,6 +51,9 @@
       <Filter>plugintemplate</Filter>
     </ClCompile>
     <ClCompile Include="..\src\PluginDefinition.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\ConfigurationManager.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
@@ -60,5 +66,10 @@
     <ResourceCompile Include="..\src\NppPluginDemo.rc">
       <Filter>plugintemplate</Filter>
     </ResourceCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <Text Include="..\rsrc\Todo.txt">
+      <Filter>Resource Files</Filter>
+    </Text>
   </ItemGroup>
 </Project>

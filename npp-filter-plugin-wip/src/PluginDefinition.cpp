@@ -77,12 +77,12 @@ void pluginInit(HANDLE /*hModule*/)
 {
 	// Creazione menu popup (non dipendono dalla finestra)
 	hFilterMenu = CreatePopupMenu();
+	AppendMenu(hFilterMenu, MF_STRING, ID_ADD_CURRENT_DOC, L"Add Current Document");
+	AppendMenu(hFilterMenu, MF_SEPARATOR, 0, NULL);
 	AppendMenu(hFilterMenu, MF_STRING, ID_ADD_FILTER, L"Add Filter");
 	AppendMenu(hFilterMenu, MF_STRING, ID_RENAME_FILTER, L"Rename Filter");
 	AppendMenu(hFilterMenu, MF_STRING, ID_DELETE_FILTER, L"Delete Filter");
 	AppendMenu(hFilterMenu, MF_STRING, ID_DELETE_FILTER_AND_CHILDREN, L"Delete Filter AND Children");
-	AppendMenu(hFilterMenu, MF_SEPARATOR, 0, NULL);
-	AppendMenu(hFilterMenu, MF_STRING, ID_ADD_CURRENT_DOC, L"Add Current Document");
 	AppendMenu(hFilterMenu, MF_SEPARATOR, 0, NULL);
 	AppendMenu(hFilterMenu, MF_STRING, ID_SAVE_CONFIG, L"Save configuration");
 
@@ -842,35 +842,73 @@ LRESULT CALLBACK ContainerProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam
 				break;
 			}
 
+			case NM_CUSTOMDRAW:
+			{
+				LPNMTVCUSTOMDRAW pcd = (LPNMTVCUSTOMDRAW)lParam;
+
+				switch (pcd->nmcd.dwDrawStage)
+				{
+				case CDDS_PREPAINT:
+					return CDRF_NOTIFYITEMDRAW;
+
+				case CDDS_ITEMPREPAINT:
+				{
+					HTREEITEM hItem = (HTREEITEM)pcd->nmcd.dwItemSpec;
+					TreeItemData* data = getItemData(hItem);
+
+					if (data && data->type == TYPE_FILTER)
+					{
+						// Colore di sfondo per i filtri
+						pcd->clrTextBk = RGB(235, 235, 235);
+					}
+					else
+					{
+						// File sfondo standard
+						pcd->clrTextBk = RGB(255, 255, 255);
+					}
+
+					return CDRF_DODEFAULT;
+				}
+				}
+
+				break;
+			}
+
 			case TVN_KEYDOWN:
 			{
 				LPNMTVKEYDOWN pKeyDown = (LPNMTVKEYDOWN)lParam;
 				HTREEITEM item = getSelectedItem();
 
-				if (!item) break;
+				if (!item) return TRUE;
 
 				switch (pKeyDown->wVKey)
 				{
 				case 'R':
+				{
 					if (getItemType(item) == TYPE_FILTER)
 					{
 						SendMessage(hwnd, WM_COMMAND, ID_RENAME_FILTER, 0);
 					}
-					return TRUE; /* Avoids default Windows beep */
+				}
+				return TRUE; /* Avoids default Windows beep */
 				case VK_RETURN:
+				{
 					if (getItemType(item) == TYPE_FILE)
 					{
 						openFile(item);
+						return TRUE;
 					}
-					return TRUE;
+				}
 
 				case VK_ESCAPE:
+				{
 					TreeView_SelectItem(hTreeView, NULL);
 					return TRUE;
+				}
 
 				case VK_DELETE:
 				case 'D':
-
+				{
 					if (getItemType(item) == TYPE_FILTER)
 					{
 						/* Delete filter only, to delete also children use the menu */
@@ -882,6 +920,7 @@ LRESULT CALLBACK ContainerProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam
 					}
 
 					return TRUE;
+				}
 				case VK_SPACE:
 				{
 					/* SPACE goes to first element of the tree; MAIUSC + SPACE goes to the last element of the tree */

@@ -22,14 +22,18 @@
 #include <fstream>
 #include <windowsx.h>
 #include "ConfigurationManager.h"
-#pragma comment(lib, "comctl32.lib")
 
-std::string configPath = "c:\\users\\user\\downloads\\filtermanager.xml";
+#include <shlwapi.h>
+#pragma comment(lib, "Shlwapi.lib")
+#pragma comment(lib, "comctl32.lib")
+std::ofstream debug("c:\\users\\user\\downloads\\debug.txt");
+
 HTREEITEM g_dragItem = NULL;
 bool g_isDragging = false;
 bool g_dragActive = false;
 POINT g_dragStartPt = {};
 const UINT_PTR TREEVIEW_SUBCLASS_ID = 1;
+std::string configPath;
 
 //
 // The plugin data that Notepad++ needs
@@ -50,7 +54,8 @@ enum MenuCommands
 	ID_RENAME_FILTER = 1002,
 	ID_DELETE_FILTER = 1003,
 	ID_ADD_CURRENT_DOC = 1004,
-	ID_REMOVE_FILE = 1005
+	ID_REMOVE_FILE = 1005,
+	ID_SAVE_CONFIG = 1006
 };
 
 // Finestra contenitore
@@ -76,6 +81,8 @@ void pluginInit(HANDLE /*hModule*/)
 	AppendMenu(hFilterMenu, MF_STRING, ID_DELETE_FILTER, L"Delete Filter");
 	AppendMenu(hFilterMenu, MF_SEPARATOR, 0, NULL);
 	AppendMenu(hFilterMenu, MF_STRING, ID_ADD_CURRENT_DOC, L"Add Current Document");
+	AppendMenu(hFilterMenu, MF_SEPARATOR, 0, NULL);
+	AppendMenu(hFilterMenu, MF_STRING, ID_SAVE_CONFIG, L"Save configuration");
 
 	hFileMenu = CreatePopupMenu();
 	AppendMenu(hFileMenu, MF_STRING, ID_REMOVE_FILE, L"Remove");
@@ -88,16 +95,6 @@ void pluginInit(HANDLE /*hModule*/)
 	myDock.pszAddInfo = nullptr;
 	myDock.hIconTab = nullptr;
 	myDock.pszModuleName = L"MyPlugin.dll";
-
-	//// configuration file path
-	//wchar_t configDir[MAX_PATH];
-	//::SendMessage(nppData._nppHandle, NPPM_GETPLUGINSCONFIGDIR, MAX_PATH, (LPARAM)configDir);
-	//
-	//std::wstring configPathW = configDir;
-	//configPathW += L"\\FilterManager.xml";
-
-	//// Converti in std::string se necessario
-	//configPath = convertWStringToUtf8(configPathW);
 }
 
 //
@@ -127,6 +124,8 @@ void commandMenuInit()
 //
 void commandMenuCleanUp()
 {
+	if (hTreeView)
+		saveTreeToXml(configPath, hTreeView);
 }
 
 //
@@ -220,6 +219,7 @@ void panel()
 
 		SetWindowSubclass(hTreeView, TreeViewSubclassProc, TREEVIEW_SUBCLASS_ID, 0);
 
+		configPath = convertWStringToUtf8(getConfigPath());
 		loadTreeFromXml(configPath, hTreeView);
 
 		myDock.hClient = hContainer;
@@ -231,12 +231,22 @@ void panel()
 		myDock.pszModuleName = L"MyPlugin.dll";
 
 		::SendMessage(nppData._nppHandle, NPPM_DMMREGASDCKDLG, 0, (LPARAM)&myDock);
-
 		return;
 	}
 
 	const bool isVisibleNow = IsWindowVisible(myDock.hClient);
 	::SendMessage(nppData._nppHandle, isVisibleNow ? NPPM_DMMHIDE : NPPM_DMMSHOW, 0, (LPARAM)myDock.hClient);
+}
+
+std::wstring getConfigPath()
+{
+	wchar_t pluginConfigPath[MAX_PATH] = { 0 };
+	::SendMessage(nppData._nppHandle, NPPM_GETPLUGINSCONFIGDIR, MAX_PATH, (LPARAM)pluginConfigPath);
+
+	std::wstring path(pluginConfigPath);
+	path += L"\\FilterManager.xml";
+
+	return path;
 }
 
 void expandNode(HTREEITEM item)
@@ -689,6 +699,11 @@ LRESULT CALLBACK ContainerProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam
 			}
 			return 0;
 		}
+		else if (cmd == ID_SAVE_CONFIG)
+		{
+			saveTreeToXml(configPath, hTreeView);
+			return 0;
+		}
 		break;
 	}
 
@@ -753,23 +768,28 @@ LRESULT CALLBACK ContainerProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam
 
 					if (type == TYPE_FILTER)
 					{
+						EnableMenuItem(hFilterMenu, ID_ADD_FILTER, MF_ENABLED);
 						EnableMenuItem(hFilterMenu, ID_RENAME_FILTER, MF_ENABLED);
 						EnableMenuItem(hFilterMenu, ID_DELETE_FILTER, MF_ENABLED);
 						EnableMenuItem(hFilterMenu, ID_ADD_CURRENT_DOC, MF_ENABLED);
+						EnableMenuItem(hFilterMenu, ID_SAVE_CONFIG, MF_ENABLED);
 						TrackPopupMenu(hFilterMenu, TPM_RIGHTBUTTON, point.x, point.y, 0, hwnd, NULL);
 					}
 					else if (type == TYPE_FILE)
 					{
+						EnableMenuItem(hFilterMenu, ID_REMOVE_FILE, MF_ENABLED);
 						TrackPopupMenu(hFileMenu, TPM_RIGHTBUTTON, point.x, point.y, 0, hwnd, NULL);
 					}
 				}
 				else
 				{
-					/* Click on empty zone shows "Add Filter" only */
+					/* Click on empty zone*/
 					unselectItem();
+					EnableMenuItem(hFilterMenu, ID_ADD_FILTER, MF_ENABLED);
 					EnableMenuItem(hFilterMenu, ID_RENAME_FILTER, MF_GRAYED);
 					EnableMenuItem(hFilterMenu, ID_DELETE_FILTER, MF_GRAYED);
 					EnableMenuItem(hFilterMenu, ID_ADD_CURRENT_DOC, MF_GRAYED);
+					EnableMenuItem(hFilterMenu, ID_SAVE_CONFIG, MF_ENABLED);
 					TrackPopupMenu(hFilterMenu, TPM_RIGHTBUTTON, point.x, point.y, 0, hwnd, NULL);
 				}
 				return TRUE;
@@ -974,6 +994,7 @@ LRESULT CALLBACK ContainerProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam
 				}
 				case 'S':
 					saveTreeToXml(configPath, hTreeView);
+					return TRUE;
 				}
 			}
 			}

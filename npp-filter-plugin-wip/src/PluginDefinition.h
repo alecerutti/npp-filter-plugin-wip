@@ -50,6 +50,7 @@ bool setCommand(size_t index, TCHAR* cmdName, PFUNCPLUGINCMD pFunc, ShortcutKey*
 
 // Comandi plugin
 void panel();
+std::wstring getConfigPath();
 
 // TreeView
 void expandNode(HTREEITEM item);

@@ -9,8 +9,6 @@ tinyxml2::XMLElement* xmlRoot = nullptr;
 tinyxml2::XMLElement* lastNode = nullptr;
 std::vector<tinyxml2::XMLElement*> parents; // vettore dei genitori per livello
 
-std::wofstream debug("c:\\users\\user\\downloads\\debug.txt");
-
 
 // SAVE TO XML
 void buildXmlRecursive(tinyxml2::XMLDocument& doc, tinyxml2::XMLElement* xmlParent, HTREEITEM hItem, HWND hTreeView) {

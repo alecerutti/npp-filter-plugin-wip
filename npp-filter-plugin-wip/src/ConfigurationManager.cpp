@@ -157,4 +157,3 @@ void loadTreeFromXml(const std::string& filename, HWND hTreeView) {
 	// 2. Avvia il caricamento ricorsivo
 	loadXmlRecursive(root, TVI_ROOT, hTreeView);
 }
-

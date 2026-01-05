@@ -22,8 +22,14 @@
 #include <fstream>
 #include <windowsx.h>
 #include "ConfigurationManager.h"
+#pragma comment(lib, "comctl32.lib")
 
-std::string configPath = "C:\\users\\user\\downloads\\FileManager.xml";
+std::string configPath = "c:\\users\\user\\downloads\\filtermanager.xml";
+HTREEITEM g_dragItem = NULL;
+bool g_isDragging = false;
+bool g_dragActive = false;
+POINT g_dragStartPt = {};
+const UINT_PTR TREEVIEW_SUBCLASS_ID = 1;
 
 //
 // The plugin data that Notepad++ needs
@@ -83,7 +89,15 @@ void pluginInit(HANDLE /*hModule*/)
 	myDock.hIconTab = nullptr;
 	myDock.pszModuleName = L"MyPlugin.dll";
 
-	// loadXmlConfiguration();
+	//// configuration file path
+	//wchar_t configDir[MAX_PATH];
+	//::SendMessage(nppData._nppHandle, NPPM_GETPLUGINSCONFIGDIR, MAX_PATH, (LPARAM)configDir);
+	//
+	//std::wstring configPathW = configDir;
+	//configPathW += L"\\FilterManager.xml";
+
+	//// Converti in std::string se necessario
+	//configPath = convertWStringToUtf8(configPathW);
 }
 
 //
@@ -139,6 +153,7 @@ bool setCommand(size_t index, TCHAR* cmdName, PFUNCPLUGINCMD pFunc, ShortcutKey*
 //----------------------------------------------//
 // declarations
 LRESULT CALLBACK ContainerProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam);
+LRESULT CALLBACK TreeViewSubclassProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam, UINT_PTR uIdSubclass, DWORD_PTR dwRefData);
 HTREEITEM addRootFilter();
 HTREEITEM addChildFilter(HTREEITEM parent);
 void deleteFilter(HTREEITEM item);
@@ -202,6 +217,8 @@ void panel()
 			GetModuleHandle(nullptr),
 			nullptr
 		);
+
+		SetWindowSubclass(hTreeView, TreeViewSubclassProc, TREEVIEW_SUBCLASS_ID, 0);
 
 		loadTreeFromXml(configPath, hTreeView);
 
@@ -423,6 +440,150 @@ ItemType getItemType(HTREEITEM item)
 	return TYPE_FILTER;
 }
 
+LRESULT CALLBACK TreeViewSubclassProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam, UINT_PTR uIdSubclass, DWORD_PTR dwRefData)
+{
+	switch (uMsg)
+	{
+	case WM_MOUSEMOVE:
+	{
+		if (g_dragActive && g_dragItem)
+		{
+			POINT pt = { GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam) };
+
+			if (!g_isDragging)
+			{
+				// Calcola la distanza dal punto di inizio
+				int dx = abs(pt.x - g_dragStartPt.x);
+				int dy = abs(pt.y - g_dragStartPt.y);
+
+				if (dx > 5 || dy > 5)
+				{
+					g_isDragging = true;
+					SetCapture(hWnd); // Cattura il mouse sulla TreeView
+				}
+			}
+
+			if (g_isDragging)
+			{
+				TVHITTESTINFO hit = {};
+				hit.pt = pt;
+				TreeView_HitTest(hWnd, &hit);
+				TreeView_SelectDropTarget(hWnd, hit.hItem);
+			}
+		}
+		break;
+	}
+
+	case WM_LBUTTONUP:
+	{
+		if (g_dragActive)
+		{
+			if (g_isDragging)
+			{
+				ReleaseCapture();
+				TreeView_SelectDropTarget(hWnd, NULL);
+
+				POINT pt = { GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam) };
+				TVHITTESTINFO hit = {};
+				hit.pt = pt;
+				TreeView_HitTest(hWnd, &hit);
+
+				if (hit.hItem && hit.hItem != g_dragItem)
+				{
+					if (getItemType(hit.hItem) == TYPE_FILTER)
+					{
+						// Chiamata alla tua funzione di spostamento logico
+						moveItemRecursive(g_dragItem, hit.hItem);
+					}
+				}
+			}
+
+			// Reset stati
+			g_dragItem = NULL;
+			g_isDragging = false;
+			g_dragActive = false;
+		}
+		break;
+	}
+
+	case WM_NCDESTROY:
+		// Rimuovi il subclass quando la finestra viene distrutta
+		RemoveWindowSubclass(hWnd, TreeViewSubclassProc, uIdSubclass);
+		break;
+	}
+
+	return DefSubclassProc(hWnd, uMsg, wParam, lParam);
+}
+
+HTREEITEM copyItemRecursive(HTREEITEM src, HTREEITEM dstParent)
+{
+	wchar_t text[260];
+
+	TVITEM tvi = {};
+	tvi.mask = TVIF_TEXT | TVIF_PARAM;
+	tvi.hItem = src;
+	tvi.pszText = text;
+	tvi.cchTextMax = 260;
+
+	TreeView_GetItem(hTreeView, &tvi);
+
+	TVINSERTSTRUCT ins = {};
+	ins.hParent = dstParent;
+	ins.hInsertAfter = TVI_LAST;
+	ins.item.mask = TVIF_TEXT | TVIF_PARAM;
+	ins.item.pszText = text;
+	ins.item.lParam = tvi.lParam;
+
+	HTREEITEM newItem = TreeView_InsertItem(hTreeView, &ins);
+
+	HTREEITEM child = TreeView_GetChild(hTreeView, src);
+	while (child)
+	{
+		copyItemRecursive(child, newItem);
+		child = TreeView_GetNextSibling(hTreeView, child);
+	}
+
+	return newItem;
+}
+
+void moveItemRecursive(HTREEITEM item, HTREEITEM newParent)
+{
+	// 1. Disabilitiamo temporaneamente la pulizia automatica dei dati
+	// Oppure, più semplicemente, resettiamo l'lParam dell'item originale
+	// in modo che TreeView_DeleteItem non trovi nulla da cancellare.
+
+	// Scolleghiamo i dati dall'item originale prima di eliminarlo
+	// Dobbiamo farlo ricorsivamente per tutto il ramo se vogliamo essere sicuri.
+
+	HTREEITEM newItem = copyItemRecursive(item, newParent);
+
+	// Per evitare che TVN_DELETEITEM cancelli i dati che abbiamo appena "passato"
+	// al nuovo item, dobbiamo resettare i parametri dell'item vecchio.
+	detachDataFromItemRecursive(item);
+
+	TreeView_DeleteItem(hTreeView, item);
+
+	TreeView_Expand(hTreeView, newParent, TVE_EXPAND);
+	TreeView_SelectItem(hTreeView, newItem);
+}
+
+// Funzione helper per "staccare" i puntatori senza cancellarli
+void detachDataFromItemRecursive(HTREEITEM item)
+{
+	TVITEM tvi = {};
+	tvi.mask = TVIF_PARAM;
+	tvi.hItem = item;
+	tvi.lParam = 0; // Reset
+	TreeView_SetItem(hTreeView, &tvi);
+
+	HTREEITEM child = TreeView_GetChild(hTreeView, item);
+	while (child)
+	{
+		detachDataFromItemRecursive(child);
+		child = TreeView_GetNextSibling(hTreeView, child);
+	}
+}
+
 LRESULT CALLBACK ContainerProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
 {
 	switch (msg)
@@ -539,31 +700,6 @@ LRESULT CALLBACK ContainerProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam
 		{
 			switch (lpnmh->code)
 			{
-			case NM_CLICK:
-			{
-				DWORD pos = GetMessagePos();
-
-				POINT pt = {
-					GET_X_LPARAM(pos),
-					GET_Y_LPARAM(pos)
-				};
-
-				ScreenToClient(hTreeView, &pt);
-
-				TVHITTESTINFO ht = {};
-				ht.pt = pt;
-
-				HTREEITEM item = TreeView_HitTest(hTreeView, &ht);
-
-				if (item)
-				{
-					TreeView_SelectItem(hTreeView, item);
-					return TRUE;
-				}
-
-				break;
-			}
-
 			case NM_DBLCLK:
 			{
 				POINT point;
@@ -580,7 +716,21 @@ LRESULT CALLBACK ContainerProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam
 				}
 				return TRUE;
 			}
+			case TVN_BEGINDRAG:
+			{
+				LPNMTREEVIEW lpnmtv = (LPNMTREEVIEW)lParam;
 
+				// Inizializza lo stato globale del drag
+				g_dragItem = lpnmtv->itemNew.hItem;
+				g_dragStartPt = lpnmtv->ptDrag; // Coordinate relative alla TreeView
+				g_dragActive = true;
+				g_isDragging = false;
+
+				// Seleziona l'item che si sta trascinando per feedback visivo
+				TreeView_SelectItem(hTreeView, g_dragItem);
+				SetFocus(hTreeView);
+				return 0;
+			}
 			case NM_RCLICK:
 			{
 				POINT point;

@@ -62,3 +62,4 @@ HTREEITEM copyItemRecursive(HTREEITEM src, HTREEITEM dstParent);
 void moveItemRecursive(HTREEITEM item, HTREEITEM newParent);
 void detachDataFromItemRecursive(HTREEITEM item);
 void deleteFilter(HTREEITEM item);
+void showShortcutsPopup();

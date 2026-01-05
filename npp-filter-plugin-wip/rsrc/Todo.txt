@@ -3,13 +3,11 @@ BUGS
 - Allow using shortcut when empty FilterManager window
 
 FEATURES TO ADD
-- Support for Xml configuration
-	- Store/Load different Xml configuration
-- Drag and Drop files under filters
-- Move
-	- files under different filter
-	- filter under different filter
-	- support such moves with shortcuits (alt + arrows/hjkl)
-- Help menu showing shortcuts
-- Applying colors to shortcuts
-- Shortcut to run panel()
+| Priorità / Utilità | Feature                             | Difficoltà  |
+| ------------------ | ----------------------------------- | ----------- |
+| Alta               | Eliminare filtro e promuovere figli | Media-bassa |
+| Alta               | Riordinare fratelli con drag & drop | Media       |
+| Media              | Gestire più configurazioni          | Media       |
+| Media              | Colori dei tab                      | Media-alta  |
+| Alta/Estetica      | Drag & drop con immagine ghost      | Alta        |
+| Alta               | Undo ultima operazione              | Molto alta  |

@@ -119,6 +119,9 @@ void commandMenuInit()
 
 	WCHAR cmdName[] = L"Show/Hide Panel";
 	setCommand(0, cmdName, panel, &sk, false);
+
+	WCHAR shortcutsName[] = L"Ugly shortcuts list";
+	setCommand(1, shortcutsName, showShortcutsPopup, nullptr, false);
 }
 
 //
@@ -1040,4 +1043,22 @@ void deleteFilter(HTREEITEM item)
 	}
 
 	TreeView_DeleteItem(hTreeView, item);
+}
+
+void showShortcutsPopup()
+{
+	const wchar_t* shortcutsText =
+		L"Ctrl+Alt+Shift+M : Show/Hide Panel\n"
+		L"R : Rename selected filter\n"
+		L"Delete / D : Delete selected file or filter\n"
+		L"A : Add current document to selected filter\n"
+		L"F : Add new filter\n"
+		L"Enter : Open selected file\n"
+		L"Space : Select first item (Shift+Space = last item)\n"
+		L"E / Shift+E : Expand node / expand all\n"
+		L"C / Shift+C : Collapse node / collapse all\n"
+		L"S : Save configuration\n"
+		L"H / L / K / J : Vim-style navigation\n";
+
+	MessageBox(nppData._nppHandle, shortcutsText, L"Plugin Shortcuts", MB_OK | MB_ICONINFORMATION);
 }

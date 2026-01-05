@@ -53,9 +53,10 @@ enum MenuCommands
 	ID_ADD_FILTER = 1001,
 	ID_RENAME_FILTER = 1002,
 	ID_DELETE_FILTER = 1003,
-	ID_ADD_CURRENT_DOC = 1004,
-	ID_REMOVE_FILE = 1005,
-	ID_SAVE_CONFIG = 1006
+	ID_DELETE_FILTER_AND_CHILDREN = 1004,
+	ID_ADD_CURRENT_DOC = 1005,
+	ID_REMOVE_FILE = 1006,
+	ID_SAVE_CONFIG = 1007
 };
 
 // Finestra contenitore
@@ -79,6 +80,7 @@ void pluginInit(HANDLE /*hModule*/)
 	AppendMenu(hFilterMenu, MF_STRING, ID_ADD_FILTER, L"Add Filter");
 	AppendMenu(hFilterMenu, MF_STRING, ID_RENAME_FILTER, L"Rename Filter");
 	AppendMenu(hFilterMenu, MF_STRING, ID_DELETE_FILTER, L"Delete Filter");
+	AppendMenu(hFilterMenu, MF_STRING, ID_DELETE_FILTER_AND_CHILDREN, L"Delete Filter AND Children");
 	AppendMenu(hFilterMenu, MF_SEPARATOR, 0, NULL);
 	AppendMenu(hFilterMenu, MF_STRING, ID_ADD_CURRENT_DOC, L"Add Current Document");
 	AppendMenu(hFilterMenu, MF_SEPARATOR, 0, NULL);
@@ -155,7 +157,6 @@ LRESULT CALLBACK ContainerProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam
 LRESULT CALLBACK TreeViewSubclassProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam, UINT_PTR uIdSubclass, DWORD_PTR dwRefData);
 HTREEITEM addRootFilter();
 HTREEITEM addChildFilter(HTREEITEM parent);
-void deleteFilter(HTREEITEM item);
 void renameFilter(HTREEITEM item);
 void addCurrentDocument(HTREEITEM filterItem);
 void removeFile(HTREEITEM fileItem);
@@ -324,30 +325,6 @@ HTREEITEM addChildFilter(HTREEITEM parent)
 	if (newItem) TreeView_SelectItem(hTreeView, newItem);
 
 	return newItem;
-}
-
-// TODO remove
-void deleteItemRecursive(HTREEITEM item)
-{
-	HTREEITEM child = TreeView_GetChild(hTreeView, item);
-	while (child)
-	{
-		HTREEITEM next = TreeView_GetNextSibling(hTreeView, child);
-		deleteItemRecursive(child);
-		child = next;
-	}
-
-	TreeItemData* data = getItemData(item);
-	if (data)
-	{
-		delete data;
-	}
-}
-
-void deleteFilter(HTREEITEM item)
-{
-	deleteItemRecursive(item);
-	TreeView_DeleteItem(hTreeView, item);
 }
 
 void renameFilter(HTREEITEM item)
@@ -645,9 +622,18 @@ LRESULT CALLBACK ContainerProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam
 		{
 			if (item && getItemType(item) == TYPE_FILTER)
 			{
+				deleteFilter(item);
+			}
+
+			return 0;
+		}
+		else if (cmd == ID_DELETE_FILTER_AND_CHILDREN)
+		{
+			if (item && getItemType(item) == TYPE_FILTER)
+			{
 				int res = MessageBox(
 					hContainer,
-					L"Are you sure to delete the selected filter and all its subfilters?",
+					L"Are you sure to delete the selected filter AND all its children?",
 					L"Confirm deletion",
 					MB_YESNO | MB_ICONWARNING | MB_DEFBUTTON2
 				);
@@ -717,6 +703,7 @@ LRESULT CALLBACK ContainerProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam
 			{
 			case NM_DBLCLK:
 			{
+				/* Dobule click on file opens file, double click on filter renames filter */
 				POINT point;
 				GetCursorPos(&point);
 				ScreenToClient(hTreeView, &point);
@@ -725,10 +712,22 @@ LRESULT CALLBACK ContainerProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam
 				thti.pt = point;
 				HTREEITEM item = TreeView_HitTest(hTreeView, &thti);
 
-				if (item && getItemType(item) == TYPE_FILE)
+				if (!item) break;
+
+				ItemType it = getItemType(item);
+
+				switch (it)
 				{
+				case TYPE_FILTER:
+					SendMessage(hwnd, WM_COMMAND, ID_RENAME_FILTER, 0);
+					return TRUE;
+				case TYPE_FILE:
 					openFile(item);
+					return TRUE;
+				default:
+					break;
 				}
+
 				return TRUE;
 			}
 			case TVN_BEGINDRAG:
@@ -771,6 +770,7 @@ LRESULT CALLBACK ContainerProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam
 						EnableMenuItem(hFilterMenu, ID_ADD_FILTER, MF_ENABLED);
 						EnableMenuItem(hFilterMenu, ID_RENAME_FILTER, MF_ENABLED);
 						EnableMenuItem(hFilterMenu, ID_DELETE_FILTER, MF_ENABLED);
+						EnableMenuItem(hFilterMenu, ID_DELETE_FILTER_AND_CHILDREN, MF_ENABLED);
 						EnableMenuItem(hFilterMenu, ID_ADD_CURRENT_DOC, MF_ENABLED);
 						EnableMenuItem(hFilterMenu, ID_SAVE_CONFIG, MF_ENABLED);
 						TrackPopupMenu(hFilterMenu, TPM_RIGHTBUTTON, point.x, point.y, 0, hwnd, NULL);
@@ -788,6 +788,7 @@ LRESULT CALLBACK ContainerProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam
 					EnableMenuItem(hFilterMenu, ID_ADD_FILTER, MF_ENABLED);
 					EnableMenuItem(hFilterMenu, ID_RENAME_FILTER, MF_GRAYED);
 					EnableMenuItem(hFilterMenu, ID_DELETE_FILTER, MF_GRAYED);
+					EnableMenuItem(hFilterMenu, ID_DELETE_FILTER_AND_CHILDREN, MF_GRAYED);
 					EnableMenuItem(hFilterMenu, ID_ADD_CURRENT_DOC, MF_GRAYED);
 					EnableMenuItem(hFilterMenu, ID_SAVE_CONFIG, MF_ENABLED);
 					TrackPopupMenu(hFilterMenu, TPM_RIGHTBUTTON, point.x, point.y, 0, hwnd, NULL);
@@ -869,6 +870,7 @@ LRESULT CALLBACK ContainerProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam
 
 					if (getItemType(item) == TYPE_FILTER)
 					{
+						/* Delete filter only, to delete also children use the menu */
 						SendMessage(hwnd, WM_COMMAND, ID_DELETE_FILTER, 0);
 					}
 					else if (getItemType(item) == TYPE_FILE)
@@ -1019,4 +1021,23 @@ LRESULT CALLBACK ContainerProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam
 	}
 
 	return DefWindowProc(hwnd, msg, wParam, lParam);
+}
+
+void deleteFilter(HTREEITEM item)
+{
+	if (!item) return;
+
+	HTREEITEM parent = TreeView_GetParent(hTreeView, item);
+	HTREEITEM child = TreeView_GetChild(hTreeView, item);
+
+	while (child)
+	{
+		HTREEITEM next = TreeView_GetNextSibling(hTreeView, child);
+
+		moveItemRecursive(child, parent);
+
+		child = next;
+	}
+
+	TreeView_DeleteItem(hTreeView, item);
 }

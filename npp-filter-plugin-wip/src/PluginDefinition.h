@@ -68,3 +68,7 @@ void collapseNodeRecursive(HTREEITEM item);
 void collapseAllNodesRecursive();
 void expandNodeRecursive(HTREEITEM item);
 void expandAllNodesRecursive();
+
+void insertItemBefore(HTREEITEM item, HTREEITEM target);
+void insertItemAfter(HTREEITEM item, HTREEITEM target);
+HTREEITEM copyItemToPosition(HTREEITEM src, HTREEITEM dstParent, HTREEITEM insertAfter);

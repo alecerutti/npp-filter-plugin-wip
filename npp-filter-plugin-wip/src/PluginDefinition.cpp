@@ -480,7 +480,61 @@ LRESULT CALLBACK TreeViewSubclassProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARA
 				TVHITTESTINFO hit = {};
 				hit.pt = pt;
 				TreeView_HitTest(hWnd, &hit);
-				TreeView_SelectDropTarget(hWnd, hit.hItem);
+
+				if (hit.hItem && hit.hItem != g_dragItem)
+				{
+					RECT itemRect;
+					TreeView_GetItemRect(hWnd, hit.hItem, &itemRect, FALSE);
+
+					int itemHeight = itemRect.bottom - itemRect.top;
+					int relativeY = pt.y - itemRect.top;
+
+					//bool ctrlPressed = (GetKeyState(VK_CONTROL) & 0x8000) != 0;
+					//bool isTargetExpanded = (TreeView_GetItemState(hWnd, hit.hItem, TVIS_EXPANDED) & TVIS_EXPANDED);
+
+					// Decide quale feedback mostrare
+					//if (ctrlPressed || (getItemType(hit.hItem) == TYPE_FILTER && !isTargetExpanded))
+					//{
+					//	// CTRL premuto o filtro chiuso  mostra HIGHLIGHT (inserimento dentro)
+					//	TreeView_SetInsertMark(hWnd, NULL, FALSE);
+					//	TreeView_SelectDropTarget(hWnd, hit.hItem);
+					//}
+					//else 
+					if (relativeY < itemHeight / 3)
+					{
+						// Terzo superiore  mostra LINEA PRIMA
+						TreeView_SelectDropTarget(hWnd, NULL);
+						TreeView_SetInsertMark(hWnd, hit.hItem, FALSE); // FALSE = prima
+					}
+					else if (relativeY > itemHeight * 2 / 3)
+					{
+						// Terzo inferiore  mostra LINEA DOPO
+						TreeView_SelectDropTarget(hWnd, NULL);
+						TreeView_SetInsertMark(hWnd, hit.hItem, TRUE); // TRUE = dopo
+					}
+					else
+					{
+						// Terzo centrale  mostra HIGHLIGHT (inserimento dentro, se è filtro)
+						if (getItemType(hit.hItem) == TYPE_FILTER)
+						{
+							TreeView_SetInsertMark(hWnd, NULL, FALSE);
+							TreeView_SelectDropTarget(hWnd, hit.hItem);
+						}
+						else
+						{
+							// Se è un file, non fare nulla
+							TreeView_SetInsertMark(hWnd, NULL, FALSE);
+							TreeView_SelectDropTarget(hWnd, NULL);
+						}
+					}
+				}
+				else
+				{
+					TreeView_SetInsertMark(hWnd, NULL, FALSE);
+					TreeView_SelectDropTarget(hWnd, NULL);
+				}
+
+				//TreeView_SelectDropTarget(hWnd, hit.hItem);
 			}
 		}
 		break;
@@ -494,6 +548,7 @@ LRESULT CALLBACK TreeViewSubclassProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARA
 			{
 				ReleaseCapture();
 				TreeView_SelectDropTarget(hWnd, NULL);
+				TreeView_SetInsertMark(hWnd, NULL, FALSE); // <-- AGGIUNGI QUESTA RIGA
 
 				POINT pt = { GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam) };
 				TVHITTESTINFO hit = {};
@@ -502,7 +557,25 @@ LRESULT CALLBACK TreeViewSubclassProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARA
 
 				if (hit.hItem && hit.hItem != g_dragItem)
 				{
-					if (getItemType(hit.hItem) == TYPE_FILTER)
+					// new
+					RECT itemRect;
+					TreeView_GetItemRect(hWnd, hit.hItem, &itemRect, FALSE);
+
+					int itemHeight = itemRect.bottom - itemRect.top;
+					int relativeY = pt.y - itemRect.top;
+
+					if (relativeY < itemHeight / 3)
+					{
+						// Terzo superiore inserisci PRIMA (come fratello)
+						insertItemBefore(g_dragItem, hit.hItem);
+					}
+					else if (relativeY > itemHeight * 2 / 3)
+					{
+						// Terzo inferiore inserisci DOPO (come fratello)
+						insertItemAfter(g_dragItem, hit.hItem);
+					}
+					//
+					else/*if(getItemType(hit.hItem) == TYPE_FILTER)*/
 					{
 						// Chiamata alla tua funzione di spostamento logico
 						moveItemRecursive(g_dragItem, hit.hItem);
@@ -1123,4 +1196,67 @@ void showShortcutsPopup()
 		L"H / L / K / J : Vim-style navigation\n";
 
 	MessageBox(nppData._nppHandle, shortcutsText, L"Plugin Shortcuts", MB_OK | MB_ICONINFORMATION);
+}
+
+void insertItemBefore(HTREEITEM item, HTREEITEM target)
+{
+	HTREEITEM targetParent = TreeView_GetParent(hTreeView, target);
+
+	// Copia l'item e i suoi figli
+	HTREEITEM newItem = copyItemToPosition(item, targetParent, target);
+
+	// Elimina il vecchio item
+	detachDataFromItemRecursive(item);
+	TreeView_DeleteItem(hTreeView, item);
+
+	// Seleziona il nuovo item
+	TreeView_SelectItem(hTreeView, newItem);
+}
+
+void insertItemAfter(HTREEITEM item, HTREEITEM target)
+{
+	HTREEITEM targetParent = TreeView_GetParent(hTreeView, target);
+	HTREEITEM insertAfter = target;
+
+	// Copia l'item e i suoi figli
+	HTREEITEM newItem = copyItemToPosition(item, targetParent, insertAfter);
+
+	// Elimina il vecchio item
+	detachDataFromItemRecursive(item);
+	TreeView_DeleteItem(hTreeView, item);
+
+	// Seleziona il nuovo item
+	TreeView_SelectItem(hTreeView, newItem);
+}
+
+HTREEITEM copyItemToPosition(HTREEITEM src, HTREEITEM dstParent, HTREEITEM insertAfter)
+{
+	wchar_t text[260];
+
+	TVITEM tvi = {};
+	tvi.mask = TVIF_TEXT | TVIF_PARAM;
+	tvi.hItem = src;
+	tvi.pszText = text;
+	tvi.cchTextMax = 260;
+
+	TreeView_GetItem(hTreeView, &tvi);
+
+	TVINSERTSTRUCT ins = {};
+	ins.hParent = dstParent;
+	ins.hInsertAfter = insertAfter;
+	ins.item.mask = TVIF_TEXT | TVIF_PARAM;
+	ins.item.pszText = text;
+	ins.item.lParam = tvi.lParam;
+
+	HTREEITEM newItem = TreeView_InsertItem(hTreeView, &ins);
+
+	// Copia ricorsivamente i figli
+	HTREEITEM child = TreeView_GetChild(hTreeView, src);
+	while (child)
+	{
+		copyItemRecursive(child, newItem);
+		child = TreeView_GetNextSibling(hTreeView, child);
+	}
+
+	return newItem;
 }

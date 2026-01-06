@@ -35,7 +35,7 @@ struct TreeItemData
 };
 
 // Const stuff
-const TCHAR NPP_PLUGIN_NAME[] = TEXT("FilterManager");
+const TCHAR NPP_PLUGIN_NAME[] = TEXT("Filter Manager");
 static const wchar_t* CONTAINER_CLASS = L"FilterManagerContainer";
 
 // Numero di comandi

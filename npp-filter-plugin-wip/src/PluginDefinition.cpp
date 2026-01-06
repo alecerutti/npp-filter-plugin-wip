@@ -213,7 +213,7 @@ void panel()
 			WS_EX_CLIENTEDGE,
 			WC_TREEVIEW,
 			L"",
-			WS_CHILD | WS_VISIBLE | WS_BORDER | TVS_HASLINES | TVS_LINESATROOT | TVS_HASBUTTONS | TVS_EDITLABELS | TVS_FULLROWSELECT,
+			WS_CHILD | WS_VISIBLE | WS_BORDER | TVS_HASLINES | TVS_LINESATROOT | TVS_HASBUTTONS | TVS_EDITLABELS | TVS_FULLROWSELECT | TVS_NOTOOLTIPS,
 			0, 0, 300, 400,
 			hContainer,
 			nullptr,
@@ -574,11 +574,19 @@ LRESULT CALLBACK TreeViewSubclassProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARA
 						// Terzo inferiore inserisci DOPO (come fratello)
 						insertItemAfter(g_dragItem, hit.hItem);
 					}
-					//
-					else/*if(getItemType(hit.hItem) == TYPE_FILTER)*/
+					else
 					{
+						// Terzo centrale, inserisci DENTRO (solo se è un filtro)
+						if (getItemType(hit.hItem) == TYPE_FILTER)
+						{
+							moveItemRecursive(g_dragItem, hit.hItem);
+						}
+						else
+						{
+							// Se è un file, inserisci DOPO (come fratello)
+							insertItemAfter(g_dragItem, hit.hItem);
+						}
 						// Chiamata alla tua funzione di spostamento logico
-						moveItemRecursive(g_dragItem, hit.hItem);
 					}
 				}
 			}
@@ -1202,8 +1210,33 @@ void insertItemBefore(HTREEITEM item, HTREEITEM target)
 {
 	HTREEITEM targetParent = TreeView_GetParent(hTreeView, target);
 
+	// Per inserire PRIMA di target, dobbiamo trovare il fratello che viene prima di target
+	HTREEITEM insertAfter = TVI_FIRST;
+
+	// Se targetParent è NULL, stiamo lavorando con i root items
+	HTREEITEM firstChild = (targetParent == NULL)
+		? TreeView_GetRoot(hTreeView)
+		: TreeView_GetChild(hTreeView, targetParent);
+
+	// Se target è il primo figlio, usa TVI_FIRST
+	if (firstChild != target)
+	{
+		// Altrimenti trova il fratello immediatamente prima di target
+		HTREEITEM sibling = firstChild;
+		while (sibling)
+		{
+			HTREEITEM next = TreeView_GetNextSibling(hTreeView, sibling);
+			if (next == target)
+			{
+				insertAfter = sibling;
+				break;
+			}
+			sibling = next;
+		}
+	}
+
 	// Copia l'item e i suoi figli
-	HTREEITEM newItem = copyItemToPosition(item, targetParent, target);
+	HTREEITEM newItem = copyItemToPosition(item, targetParent, insertAfter);
 
 	// Elimina il vecchio item
 	detachDataFromItemRecursive(item);

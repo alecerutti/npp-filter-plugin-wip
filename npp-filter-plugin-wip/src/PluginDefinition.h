@@ -63,3 +63,8 @@ void moveItemRecursive(HTREEITEM item, HTREEITEM newParent);
 void detachDataFromItemRecursive(HTREEITEM item);
 void deleteFilter(HTREEITEM item);
 void showShortcutsPopup();
+
+void collapseNodeRecursive(HTREEITEM item);
+void collapseAllNodesRecursive();
+void expandNodeRecursive(HTREEITEM item);
+void expandAllNodesRecursive();

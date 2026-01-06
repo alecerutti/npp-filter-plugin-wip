@@ -50,7 +50,7 @@ NppData nppData;
 
 enum MenuCommands
 {
-	ID_ADD_FILTER = 1001,
+	ID_ADD_CHILD_FILTER = 1001,
 	ID_RENAME_FILTER = 1002,
 	ID_DELETE_FILTER = 1003,
 	ID_DELETE_FILTER_AND_CHILDREN = 1004,
@@ -79,7 +79,7 @@ void pluginInit(HANDLE /*hModule*/)
 	hFilterMenu = CreatePopupMenu();
 	AppendMenu(hFilterMenu, MF_STRING, ID_ADD_CURRENT_DOC, L"Add Current Document");
 	AppendMenu(hFilterMenu, MF_SEPARATOR, 0, NULL);
-	AppendMenu(hFilterMenu, MF_STRING, ID_ADD_FILTER, L"Add Filter");
+	AppendMenu(hFilterMenu, MF_STRING, ID_ADD_CHILD_FILTER, L"Add Filter");
 	AppendMenu(hFilterMenu, MF_STRING, ID_RENAME_FILTER, L"Rename Filter");
 	AppendMenu(hFilterMenu, MF_STRING, ID_DELETE_FILTER, L"Delete Filter");
 	AppendMenu(hFilterMenu, MF_STRING, ID_DELETE_FILTER_AND_CHILDREN, L"Delete Filter AND Children");
@@ -111,10 +111,10 @@ void pluginCleanUp()
 // You should fill your plugins commands here
 void commandMenuInit()
 {
-	ShortcutKey sk;
+	static ShortcutKey sk;
 	sk._isCtrl = true;
 	sk._isAlt = true;
-	sk._isShift = true;
+	sk._isShift = false;
 	sk._key = 'M';
 
 	WCHAR cmdName[] = L"Show/Hide Panel";
@@ -253,38 +253,55 @@ std::wstring getConfigPath()
 	return path;
 }
 
-void expandNode(HTREEITEM item)
+void collapseNodeRecursive(HTREEITEM item)
 {
 	if (!item) return;
 
-	TreeView_Expand(hTreeView, item, TVE_EXPAND);
-}
+	HTREEITEM next_item = TreeView_GetChild(hTreeView, item);
 
-void collapseNode(HTREEITEM item)
-{
-	if (!item) return;
+	while (next_item)
+	{
+		collapseNodeRecursive(next_item);
+		next_item = TreeView_GetNextSibling(hTreeView, next_item);
+	}
 
 	TreeView_Expand(hTreeView, item, TVE_COLLAPSE);
 }
 
-void expandAllNodes()
+void collapseAllNodesRecursive()
 {
 	HTREEITEM item = TreeView_GetRoot(hTreeView);
 
 	while (item)
 	{
-		expandNode(item);
+		collapseNodeRecursive(item);
 		item = TreeView_GetNextSibling(hTreeView, item);
 	}
 }
 
-void collapseAllNodes()
+
+void expandNodeRecursive(HTREEITEM item)
+{
+	if (!item) return;
+
+	HTREEITEM next_item = TreeView_GetChild(hTreeView, item);
+
+	while (next_item)
+	{
+		expandNodeRecursive(next_item);
+		next_item = TreeView_GetNextSibling(hTreeView, next_item);
+	}
+
+	TreeView_Expand(hTreeView, item, TVE_EXPAND);
+}
+
+void expandAllNodesRecursive()
 {
 	HTREEITEM item = TreeView_GetRoot(hTreeView);
 
 	while (item)
 	{
-		collapseNode(item);
+		expandNodeRecursive(item);
 		item = TreeView_GetNextSibling(hTreeView, item);
 	}
 }
@@ -403,6 +420,11 @@ HTREEITEM getSelectedItem()
 void unselectItem()
 {
 	TreeView_SelectItem(hTreeView, NULL);
+}
+
+void selectItem(HTREEITEM item)
+{
+	TreeView_SelectItem(hTreeView, item);
 }
 
 TreeItemData* getItemData(HTREEITEM item)
@@ -606,7 +628,7 @@ LRESULT CALLBACK ContainerProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam
 		int cmd = LOWORD(wParam);
 		HTREEITEM item = getSelectedItem();
 
-		if (cmd == ID_ADD_FILTER)
+		if (cmd == ID_ADD_CHILD_FILTER)
 		{
 			if (item)
 			{
@@ -770,7 +792,7 @@ LRESULT CALLBACK ContainerProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam
 
 					if (type == TYPE_FILTER)
 					{
-						EnableMenuItem(hFilterMenu, ID_ADD_FILTER, MF_ENABLED);
+						EnableMenuItem(hFilterMenu, ID_ADD_CHILD_FILTER, MF_ENABLED);
 						EnableMenuItem(hFilterMenu, ID_RENAME_FILTER, MF_ENABLED);
 						EnableMenuItem(hFilterMenu, ID_DELETE_FILTER, MF_ENABLED);
 						EnableMenuItem(hFilterMenu, ID_DELETE_FILTER_AND_CHILDREN, MF_ENABLED);
@@ -788,7 +810,7 @@ LRESULT CALLBACK ContainerProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam
 				{
 					/* Click on empty zone*/
 					unselectItem();
-					EnableMenuItem(hFilterMenu, ID_ADD_FILTER, MF_ENABLED);
+					EnableMenuItem(hFilterMenu, ID_ADD_CHILD_FILTER, MF_ENABLED);
 					EnableMenuItem(hFilterMenu, ID_RENAME_FILTER, MF_GRAYED);
 					EnableMenuItem(hFilterMenu, ID_DELETE_FILTER, MF_GRAYED);
 					EnableMenuItem(hFilterMenu, ID_DELETE_FILTER_AND_CHILDREN, MF_GRAYED);
@@ -954,21 +976,24 @@ LRESULT CALLBACK ContainerProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam
 				}
 				case 'F':
 				{
+					/* Shift + F: adds sibling; F: adds child */
 					bool shiftPressed = (GetKeyState(VK_SHIFT) & 0x8000) != 0;
 					bool capsLockOn = (GetKeyState(VK_CAPITAL) & 0x0001) != 0;
 					bool isUpper = ((capsLockOn && !shiftPressed) || (!capsLockOn && shiftPressed));
 
+					if (getItemType(item) != TYPE_FILTER) return FALSE;
+
 					if (isUpper)
 					{
-						unselectItem();
-						SendMessage(hwnd, WM_COMMAND, ID_ADD_FILTER, 0);
+						//unselectItem();
+						HTREEITEM parent = TreeView_GetParent(hTreeView, item);
+						selectItem(parent);
+
+						SendMessage(hwnd, WM_COMMAND, ID_ADD_CHILD_FILTER, 0);
 					}
 					else
 					{
-						if (getItemType(item) == TYPE_FILTER)
-						{
-							SendMessage(hwnd, WM_COMMAND, ID_ADD_FILTER, 0);
-						}
+						SendMessage(hwnd, WM_COMMAND, ID_ADD_CHILD_FILTER, 0);
 					}
 					return TRUE;
 				}
@@ -997,7 +1022,6 @@ LRESULT CALLBACK ContainerProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam
 					return TRUE;
 
 				case 'E':
-				case 'e':
 				{
 					if (getItemType(item) != TYPE_FILTER)
 						return FALSE;
@@ -1008,16 +1032,15 @@ LRESULT CALLBACK ContainerProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam
 
 					if (isUpper)
 					{
-						expandAllNodes();
+						expandAllNodesRecursive();
 					}
 					else
 					{
-						expandNode(item);
+						expandNodeRecursive(item);
 					}
 					return TRUE;
 				}
 				case 'C':
-				case 'c':
 				{
 					if (getItemType(item) != TYPE_FILTER)
 						return FALSE;
@@ -1028,11 +1051,11 @@ LRESULT CALLBACK ContainerProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam
 
 					if (isUpper)
 					{
-						collapseAllNodes();
+						collapseAllNodesRecursive();
 					}
 					else
 					{
-						collapseNode(item);
+						collapseNodeRecursive(item);
 					}
 					return TRUE;
 				}

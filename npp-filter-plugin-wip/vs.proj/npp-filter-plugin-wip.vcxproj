@@ -59,6 +59,7 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClInclude Include="..\src\ConfigurationManager.h" />
+    <ClInclude Include="..\src\FilterTree.h" />
     <ClInclude Include="..\src\menuCmdID.h" />
     <ClInclude Include="..\src\Notepad_plus_msgs.h" />
     <ClInclude Include="..\src\Panel.h" />
@@ -69,6 +70,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\src\ConfigurationManager.cpp" />
+    <ClCompile Include="..\src\FilterTree.cpp" />
     <ClCompile Include="..\src\NppPluginDemo.cpp" />
     <ClCompile Include="..\src\Panel.cpp" />
     <ClCompile Include="..\src\PluginDefinition.cpp" />

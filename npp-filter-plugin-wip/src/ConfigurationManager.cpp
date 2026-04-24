@@ -1,114 +1,99 @@
-#include "ConfigurationManager.h"
-#include "PluginDefinition.h"
+﻿#include "ConfigurationManager.h"
+#include "tinyxml2.h"
 
-void buildXmlRecursive(tinyxml2::XMLDocument& doc, tinyxml2::XMLElement* xmlParent, HTREEITEM hItem, HWND hTreeView) {
-    while (hItem != nullptr) {
-        wchar_t buffer[MAX_PATH];
-        TVITEMW tvi = { 0 };
+std::string toUtf8(const std::wstring& wstr) {
+    if (wstr.empty()) return {};
+    int n = WideCharToMultiByte(CP_UTF8, 0, wstr.c_str(), (int)wstr.size(), nullptr, 0, nullptr, nullptr);
+    std::string out(n, '\0');
+    WideCharToMultiByte(CP_UTF8, 0, wstr.c_str(), (int)wstr.size(), &out[0], n, nullptr, nullptr);
+    return out;
+}
+
+std::wstring fromUtf8(const char* str) {
+    if (!str) return L"";
+    int n = MultiByteToWideChar(CP_UTF8, 0, str, -1, nullptr, 0);
+    std::wstring out(n, L'\0');
+    MultiByteToWideChar(CP_UTF8, 0, str, -1, &out[0], n);
+    out.resize(wcslen(out.c_str()));   // strip null terminator from size
+    return out;
+}
+
+static void buildXml(tinyxml2::XMLDocument& doc, tinyxml2::XMLElement* xmlParent,
+    HTREEITEM hItem, FilterTree& tree)
+{
+    for (; hItem; hItem = TreeView_GetNextSibling(tree.hwnd, hItem)) {
+        wchar_t buf[MAX_PATH] = {};
+        TVITEMW tvi = {};
         tvi.hItem = hItem;
         tvi.mask = TVIF_TEXT | TVIF_PARAM;
-        tvi.pszText = buffer;
+        tvi.pszText = buf;
         tvi.cchTextMax = MAX_PATH;
+        if (!TreeView_GetItem(tree.hwnd, &tvi)) continue;
 
-        if (TreeView_GetItem(hTreeView, &tvi)) {
-            std::string nameUtf8 = convertWStringToUtf8(buffer);
-            TreeItemData* data = reinterpret_cast<TreeItemData*>(tvi.lParam);
-            tinyxml2::XMLElement* currentElement = nullptr;
+        TreeItemData* data = (TreeItemData*)tvi.lParam;
+        tinyxml2::XMLElement* el;
 
-            if (data && data->type == TYPE_FILE) {
-                currentElement = doc.NewElement("file");
-                currentElement->SetAttribute("name", nameUtf8.c_str());
-                std::string pathUtf8 = convertWStringToUtf8(data->filePath);
-                currentElement->SetAttribute("path", pathUtf8.c_str());
-            }
-            else {
-                currentElement = doc.NewElement("filter");
-                currentElement->SetAttribute("name", nameUtf8.c_str());
-                HTREEITEM hChild = TreeView_GetChild(hTreeView, hItem);
-                if (hChild != nullptr) {
-                    buildXmlRecursive(doc, currentElement, hChild, hTreeView);
-                }
-            }
-
-            if (currentElement) {
-                xmlParent->InsertEndChild(currentElement);
-            }
+        if (data && data->type == TYPE_FILE) {
+            el = doc.NewElement("file");
+            el->SetAttribute("name", toUtf8(buf).c_str());
+            el->SetAttribute("path", toUtf8(data->filePath).c_str());
         }
-        hItem = TreeView_GetNextSibling(hTreeView, hItem);
+        else {
+            el = doc.NewElement("filter");
+            el->SetAttribute("name", toUtf8(buf).c_str());
+            HTREEITEM child = TreeView_GetChild(tree.hwnd, hItem);
+            if (child) buildXml(doc, el, child, tree);
+        }
+        xmlParent->InsertEndChild(el);
     }
 }
 
-void saveTreeToXml(const std::string& filename, HWND hTreeView) {
+void saveTree(const std::string& filename, FilterTree& tree) {
     tinyxml2::XMLDocument doc;
     doc.InsertEndChild(doc.NewDeclaration());
 
-    tinyxml2::XMLElement* root = doc.NewElement("FilterManager");
+    auto* root = doc.NewElement("FilterManager");
     doc.InsertEndChild(root);
 
-    HTREEITEM hRoot = TreeView_GetRoot(hTreeView);
-    if (hRoot) {
-        buildXmlRecursive(doc, root, hRoot, hTreeView);
-    }
+    HTREEITEM hRoot = TreeView_GetRoot(tree.hwnd);
+    if (hRoot) buildXml(doc, root, hRoot, tree);
+
     doc.SaveFile(filename.c_str());
 }
 
-std::string convertWStringToUtf8(const std::wstring& wstr) {
-    if (wstr.empty()) return std::string();
-    int size_needed = WideCharToMultiByte(CP_UTF8, 0, &wstr[0], (int)wstr.size(), NULL, 0, NULL, NULL);
-    std::string strTo(size_needed, 0);
-    WideCharToMultiByte(CP_UTF8, 0, &wstr[0], (int)wstr.size(), &strTo[0], size_needed, NULL, NULL);
-    return strTo;
-}
-
-std::wstring convertUtf8ToWString(const char* str) {
-    if (!str) return L"";
-    int size_needed = MultiByteToWideChar(CP_UTF8, 0, str, -1, NULL, 0);
-    std::wstring wstrTo(size_needed, 0);
-    MultiByteToWideChar(CP_UTF8, 0, str, -1, &wstrTo[0], size_needed);
-    return wstrTo.c_str();
-}
-
-void loadXmlRecursive(tinyxml2::XMLElement* xmlElement, HTREEITEM hParent, HWND hTreeView) {
-    for (tinyxml2::XMLElement* e = xmlElement->FirstChildElement(); e != nullptr; e = e->NextSiblingElement()) {
-        std::string tagName = e->Value();
-        const char* nameAttr = e->Attribute("name");
-        std::wstring wName = convertUtf8ToWString(nameAttr);
+static void loadXml(tinyxml2::XMLElement* xmlEl, HTREEITEM hParent, FilterTree& tree) {
+    for (auto* e = xmlEl->FirstChildElement(); e; e = e->NextSiblingElement()) {
+        std::wstring name = fromUtf8(e->Attribute("name"));
         TreeItemData* data = new TreeItemData();
 
-        if (tagName == "filter") {
+        TVINSERTSTRUCT tvis = {};
+        tvis.hParent = hParent;
+        tvis.hInsertAfter = TVI_LAST;
+        tvis.item.mask = TVIF_TEXT | TVIF_PARAM;
+        tvis.item.pszText = const_cast<wchar_t*>(name.data()); // TODO remove const_cast
+        tvis.item.lParam = (LPARAM)data;
+
+        if (strcmp(e->Value(), "filter") == 0) {
             data->type = TYPE_FILTER;
-            TVINSERTSTRUCT tvis = { 0 };
-            tvis.hParent = hParent;
-            tvis.hInsertAfter = TVI_LAST;
-            tvis.item.mask = TVIF_TEXT | TVIF_PARAM;
-            tvis.item.pszText = const_cast<wchar_t*>(wName.c_str());
-            tvis.item.lParam = reinterpret_cast<LPARAM>(data);
-            HTREEITEM hNewFilter = TreeView_InsertItem(hTreeView, &tvis);
-            loadXmlRecursive(e, hNewFilter, hTreeView);
-            TreeView_Expand(hTreeView, hNewFilter, TVE_EXPAND);
+            HTREEITEM hNew = TreeView_InsertItem(tree.hwnd, &tvis);
+            loadXml(e, hNew, tree);
+            TreeView_Expand(tree.hwnd, hNew, TVE_EXPAND);
         }
-        else if (tagName == "file") {
+        else {    // "file"
             data->type = TYPE_FILE;
-            const char* pathAttr = e->Attribute("path");
-            data->filePath = convertUtf8ToWString(pathAttr);
-            TVINSERTSTRUCT tvis = { 0 };
-            tvis.hParent = hParent;
-            tvis.hInsertAfter = TVI_LAST;
-            tvis.item.mask = TVIF_TEXT | TVIF_PARAM;
-            tvis.item.pszText = const_cast<wchar_t*>(wName.c_str());
-            tvis.item.lParam = reinterpret_cast<LPARAM>(data);
-            TreeView_InsertItem(hTreeView, &tvis);
+            data->filePath = fromUtf8(e->Attribute("path"));
+            TreeView_InsertItem(tree.hwnd, &tvis);
         }
     }
 }
 
-void loadTreeFromXml(const std::string& filename, HWND hTreeView) {
+void loadTree(const std::string& filename, FilterTree& tree) {
     tinyxml2::XMLDocument doc;
     if (doc.LoadFile(filename.c_str()) != tinyxml2::XML_SUCCESS) return;
 
-    tinyxml2::XMLElement* root = doc.FirstChildElement("FilterManager");
+    auto* root = doc.FirstChildElement("FilterManager");
     if (!root) return;
 
-    TreeView_DeleteAllItems(hTreeView);
-    loadXmlRecursive(root, TVI_ROOT, hTreeView);
+    TreeView_DeleteAllItems(tree.hwnd);
+    loadXml(root, TVI_ROOT, tree);
 }

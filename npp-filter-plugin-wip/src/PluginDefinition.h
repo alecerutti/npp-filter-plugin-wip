@@ -1,52 +1,24 @@
 #pragma once
-
 #include "PluginInterface.h"
+#include "FilterTree.h"
 #include <commctrl.h>
-#include "tinyxml2.h"
-#include <string>
-
-enum ItemType
-{
-    TYPE_FILTER = 0,
-    TYPE_FILE = 1
-};
-
-struct TreeItemData
-{
-    ItemType type;
-    std::wstring filePath;
-};
 
 const TCHAR NPP_PLUGIN_NAME[] = TEXT("Filter Manager");
-static const wchar_t* CONTAINER_CLASS = L"FilterManagerContainer";
+const int   nbFunc = 1;
 
-// Number of commands reduced to 1 (panel only)
-const int nbFunc = 1;
+extern FuncItem funcItem[nbFunc];
+extern NppData  nppData;
 
-void pluginInit(HANDLE hModule);
-void pluginCleanUp();
+// Initialization/cleanup functions
 void commandMenuInit();
 void commandMenuCleanUp();
-bool setCommand(size_t index, TCHAR* cmdName, PFUNCPLUGINCMD pFunc, ShortcutKey* sk = nullptr, bool check0nInit = false);
+void pluginInit(HANDLE hModule);
+void pluginCleanUp();
 
+// Make pFunc visible and invokable from Notepad++ Plugins tab
+bool setCommand(size_t index, TCHAR* cmdName, PFUNCPLUGINCMD pFunc,
+    ShortcutKey* sk = nullptr, bool check0nInit = false);
+
+// Custom functions
 void panel();
 std::wstring getConfigPath();
-
-void expandNode(HTREEITEM item);
-void collapseNode(HTREEITEM item);
-void expandAllNodes();
-void collapseAllNodes();
-
-HTREEITEM copyItemRecursive(HTREEITEM src, HTREEITEM dstParent);
-void moveItemRecursive(HTREEITEM item, HTREEITEM newParent);
-void detachDataFromItemRecursive(HTREEITEM item);
-void deleteFilter(HTREEITEM item);
-
-void collapseNodeRecursive(HTREEITEM item);
-void collapseAllNodesRecursive();
-void expandNodeRecursive(HTREEITEM item);
-void expandAllNodesRecursive();
-
-void insertItemBefore(HTREEITEM item, HTREEITEM target);
-void insertItemAfter(HTREEITEM item, HTREEITEM target);
-HTREEITEM copyItemToPosition(HTREEITEM src, HTREEITEM dstParent, HTREEITEM insertAfter);

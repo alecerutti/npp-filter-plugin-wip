@@ -1,43 +1,30 @@
 #include "FilterManager.h"
+#include "DockingPanel.h"
 
-/// DEBUG
-#include <fstream>
-#include <iostream>
-#include <ctime>
-#include <string>
-
-std::string get_simple_timestamp() {
-    std::time_t now = std::time(nullptr);
-    std::tm tm_struct;
-    char buf[20];
-
-    // Versione sicura per MSVC (Windows)
-    localtime_s(&tm_struct, &now);
-
-    std::strftime(buf, sizeof(buf), "%Y_%m_%d_%H_%M_%S", &tm_struct);
-
-    return std::string(buf);
-}
-//
-
-const wchar_t PLUGIN_NAME[] = L"FilterManager";
+DockingPanel* pluginPanel = nullptr;
 NppData nppData;
 std::vector<FuncItem> nppMenu;
 
 void loadPlugin() {
-    // DEBUG
-    std::ofstream("c:\\users\\user\\downloads\\filtermanager\\load_working.txt");
-
-    initializeMenu();
+    pluginPanel = new DockingPanel();
+    pluginPanel->init(nppData, 0, getPluginConfigPath());
 }
 
 void unloadPlugin() {
-    std::ofstream("c:\\users\\user\\downloads\\filtermanager\\unlodad_working.txt");
+    if (pluginPanel) {
+        pluginPanel->saveConfiguration();
+        delete pluginPanel;
+        pluginPanel = nullptr;
+    }
+    for (auto& item : nppMenu) {
+        if (item._pShKey) delete item._pShKey;
+    }
 }
 
 void initializeMenu()
 {
-    addMenuItem(L"dummy_fucntion", dummyFunc, false, createShortcut('J'));
+    addMenuItem(L"Show/Hide Panel", togglePanel, false, createShortcut('J'));
+    addMenuItem(L"Save", saveTree);
 }
 
 void addMenuItem(const wchar_t* title, PFUNCPLUGINCMD action, bool checked, ShortcutKey* shortcut)
@@ -62,17 +49,33 @@ ShortcutKey* createShortcut(unsigned char key, bool enableALT, bool enableCTRL, 
     return shortcut;
 }
 
-void dummyFunc()
+std::string getPluginConfigPath()
 {
-    std::string filename = "c:\\users\\user\\downloads\\filtermanager\\" + get_simple_timestamp() + ".txt";
-    std::ofstream(filename.c_str());
+    wchar_t dir[MAX_PATH] = {};
+    ::SendMessage(nppData._nppHandle, NPPM_GETPLUGINSCONFIGDIR, MAX_PATH, (LPARAM)dir);
+    std::wstring wPath = std::wstring(dir) + L"\\FilterManager.xml";
+    int n = WideCharToMultiByte(CP_UTF8, 0, wPath.c_str(), (int)wPath.size(), nullptr, 0, nullptr, nullptr);
+    std::string out(n, '\0');
+    WideCharToMultiByte(CP_UTF8, 0, wPath.c_str(), (int)wPath.size(), &out[0], n, nullptr, nullptr);
+    return out;
+}
+
+void togglePanel()
+{
+    if (pluginPanel) pluginPanel->toggle();
+}
+
+void saveTree()
+{
+    if (pluginPanel) pluginPanel->saveConfiguration();
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////
 
 extern "C" __declspec(dllexport) void setInfo(NppData notpadPlusData) {
     nppData = notpadPlusData;
-    loadPlugin();
+    initializeMenu();
+    //loadPlugin();
 }
 
 // The getName function tells Notepad++ plugins system its name
@@ -83,7 +86,6 @@ extern "C" __declspec(dllexport) const TCHAR* getName() {
 // The getFuncsArray function gives Notepad++ plugins system the pointer FuncItem Array
 // and the size of this array (the number of functions)
 extern "C" __declspec(dllexport) FuncItem* getFuncsArray(int* nbF) {
-
     *nbF = static_cast<int>(nppMenu.size());
     return nppMenu.data();
 }
@@ -97,6 +99,11 @@ extern "C" __declspec(dllexport) void beNotified(SCNotification* notifyCode)
 {
     switch (notifyCode->nmhdr.code)
     {
+    case NPPN_READY:
+    {
+        loadPlugin();
+        break;
+    }
     case NPPN_SHUTDOWN:
     {
         unloadPlugin();

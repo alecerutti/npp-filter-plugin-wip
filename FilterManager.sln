@@ -5,9 +5,10 @@ VisualStudioVersion = 17.12.35707.178
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "tinyxml2", "thirdparty\tinyxml2\vs.proj\tinyxml2.vcxproj", "{AE7176EE-6C52-402E-B73A-E3A1CD9FFF60}"
 EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "npp-filter-plugin-wip", "npp-filter-plugin-wip\vs.proj\npp-filter-plugin-wip.vcxproj", "{3D85CEEA-09CB-4217-8DA1-AA63D81A45E9}"
-EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "FilterManager", "FilterManager\FilterManager.vcxproj", "{0334DB4F-8BBB-4AE3-956A-E740644367DC}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "FilterManager", "FilterManager\make\FilterManager.vcxproj", "{0334DB4F-8BBB-4AE3-956A-E740644367DC}"
+	ProjectSection(ProjectDependencies) = postProject
+		{AE7176EE-6C52-402E-B73A-E3A1CD9FFF60} = {AE7176EE-6C52-402E-B73A-E3A1CD9FFF60}
+	EndProjectSection
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -16,8 +17,6 @@ Global
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
 		{AE7176EE-6C52-402E-B73A-E3A1CD9FFF60}.Release|x64.ActiveCfg = Release|x64
 		{AE7176EE-6C52-402E-B73A-E3A1CD9FFF60}.Release|x64.Build.0 = Release|x64
-		{3D85CEEA-09CB-4217-8DA1-AA63D81A45E9}.Release|x64.ActiveCfg = Release|x64
-		{3D85CEEA-09CB-4217-8DA1-AA63D81A45E9}.Release|x64.Build.0 = Release|x64
 		{0334DB4F-8BBB-4AE3-956A-E740644367DC}.Release|x64.ActiveCfg = Release|x64
 		{0334DB4F-8BBB-4AE3-956A-E740644367DC}.Release|x64.Build.0 = Release|x64
 	EndGlobalSection

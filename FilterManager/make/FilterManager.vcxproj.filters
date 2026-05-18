@@ -1,0 +1,108 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="Source Files">
+      <UniqueIdentifier>{4FC737F1-C7A5-4376-A066-2A32D752A2FF}</UniqueIdentifier>
+      <Extensions>cpp;c;cc;cxx;c++;cppm;ixx;def;odl;idl;hpj;bat;asm;asmx</Extensions>
+    </Filter>
+    <Filter Include="Header Files">
+      <UniqueIdentifier>{93995380-89BD-4b04-88EB-625FBE52EBFB}</UniqueIdentifier>
+      <Extensions>h;hh;hpp;hxx;h++;hm;inl;inc;ipp;xsd</Extensions>
+    </Filter>
+    <Filter Include="Resource Files">
+      <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
+      <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
+    </Filter>
+    <Filter Include="Header Files\Notepadpp">
+      <UniqueIdentifier>{722684f8-20c9-4d35-bbf7-e0a6b3d6b1c7}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files\Notepadpp\DockingFeature">
+      <UniqueIdentifier>{52c50683-b249-4ff7-be07-9b545aa895fd}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\Notepadpp">
+      <UniqueIdentifier>{3147c933-1af3-42b6-a6df-11c11b9f670b}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\Notepadpp\DockingFeature">
+      <UniqueIdentifier>{687ae431-7736-4323-b805-c54db7ab637a}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="..\src\FilterManager.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\FilterTree.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\ConfigManager.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\dllmain.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\DockingPanel.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\notepadpp\DockingFeature\GoToLineDlg.cpp">
+      <Filter>Source Files\Notepadpp\DockingFeature</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\notepadpp\DockingFeature\StaticDialog.cpp">
+      <Filter>Source Files\Notepadpp\DockingFeature</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="..\src\notepadpp\menuCmdID.h">
+      <Filter>Header Files\Notepadpp</Filter>
+    </ClInclude>
+    <ClInclude Include="..\src\notepadpp\Notepad_plus_msgs.h">
+      <Filter>Header Files\Notepadpp</Filter>
+    </ClInclude>
+    <ClInclude Include="..\src\notepadpp\PluginInterface.h">
+      <Filter>Header Files\Notepadpp</Filter>
+    </ClInclude>
+    <ClInclude Include="..\src\notepadpp\resource.h">
+      <Filter>Header Files\Notepadpp</Filter>
+    </ClInclude>
+    <ClInclude Include="..\src\notepadpp\Sci_Position.h">
+      <Filter>Header Files\Notepadpp</Filter>
+    </ClInclude>
+    <ClInclude Include="..\src\notepadpp\Scintilla.h">
+      <Filter>Header Files\Notepadpp</Filter>
+    </ClInclude>
+    <ClInclude Include="..\src\notepadpp\DockingFeature\dockingResource.h">
+      <Filter>Header Files\Notepadpp\DockingFeature</Filter>
+    </ClInclude>
+    <ClInclude Include="..\src\notepadpp\DockingFeature\GoToLineDlg.h">
+      <Filter>Header Files\Notepadpp\DockingFeature</Filter>
+    </ClInclude>
+    <ClInclude Include="..\src\notepadpp\DockingFeature\resource.h">
+      <Filter>Header Files\Notepadpp\DockingFeature</Filter>
+    </ClInclude>
+    <ClInclude Include="..\src\notepadpp\DockingFeature\StaticDialog.h">
+      <Filter>Header Files\Notepadpp\DockingFeature</Filter>
+    </ClInclude>
+    <ClInclude Include="..\src\notepadpp\DockingFeature\Window.h">
+      <Filter>Header Files\Notepadpp\DockingFeature</Filter>
+    </ClInclude>
+    <ClInclude Include="..\src\notepadpp\DockingFeature\Docking.h">
+      <Filter>Header Files\Notepadpp\DockingFeature</Filter>
+    </ClInclude>
+    <ClInclude Include="..\src\notepadpp\DockingFeature\DockingDlgInterface.h">
+      <Filter>Header Files\Notepadpp\DockingFeature</Filter>
+    </ClInclude>
+    <ClInclude Include="..\src\DockingPanel.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\src\FilterManager.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\src\FilterTree.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\src\ConfigManager.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\src\defs.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+  </ItemGroup>
+</Project>
